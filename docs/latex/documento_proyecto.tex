@@ -1,0 +1,256 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{titlesec}
+
+\geometry{margin=2.5cm}
+\setlist[itemize]{noitemsep, topsep=3pt}
+\setlist[enumerate]{noitemsep, topsep=3pt}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    pdftitle={Proyecto Neo4j},
+    pdfauthor={Grupo de trabajo}
+}
+
+\title{Proyecto No. 2 Neo4j\\\large Motor de recomendación de películas y series}
+\author{Grupo de trabajo}
+\date{Abril 2026}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Resumen ejecutivo}
+
+Este proyecto implementa un motor de recomendación de películas y series sobre Neo4j, utilizando AuraDB como motor de base de datos y Python con FastAPI como capa de carga y automatización. El enfoque principal es modelar un grafo con múltiples etiquetas, propiedades y relaciones, cargar más de 5000 nodos a partir de archivos CSV y exponer operaciones y consultas que permitan demostrar el funcionamiento del sistema.
+
+\section{Objetivo}
+
+Desarrollar una aplicación funcional que permita almacenar, consultar y manipular información de películas, usuarios e interacciones, garantizando la trazabilidad de los datos y el cumplimiento de la rúbrica del curso. El modelo de datos está orientado a facilitar recomendaciones basadas en similitud de usuarios, preferencias y contenido.
+
+\section{Caso de uso}
+
+El caso de uso seleccionado es el de motor de recomendación. La base de datos representa películas, géneros, directores y usuarios simulados con sus vistas, calificaciones, preferencias y relaciones de amistad. Con esta estructura se pueden ejecutar consultas de filtrado, agregación, recomendaciones y validación de conectividad del grafo.
+
+\section{Tecnologías utilizadas}
+
+\begin{itemize}
+    \item Neo4j AuraDB.
+    \item Python 3.13.
+    \item Neo4j Python Driver.
+    \item python-dotenv.
+    \item FastAPI para la capa de backend.
+    \item CSV como formato de carga de datos.
+\end{itemize}
+
+\section{Fuentes de datos}
+
+Se partió de un archivo principal de películas y se generó data sintética adicional para usuarios e interacciones. Luego se realizó una limpieza ligera para normalizar campos, convertir tipos de datos y eliminar duplicados o valores inválidos.
+
+\subsection{Archivos principales}
+
+\begin{itemize}
+    \item \texttt{data/movies.csv}
+    \item \texttt{data/users.csv}
+    \item \texttt{data/user\_views.csv}
+    \item \texttt{data/user\_ratings.csv}
+    \item \texttt{data/user\_preferences.csv}
+    \item \texttt{data/user\_friendships.csv}
+\end{itemize}
+
+\subsection{Archivos limpios}
+
+\begin{itemize}
+    \item \texttt{data/clean/movies\_clean.csv}
+    \item \texttt{data/clean/movie\_genres\_clean.csv}
+    \item \texttt{data/clean/users\_clean.csv}
+    \item \texttt{data/clean/user\_views\_clean.csv}
+    \item \texttt{data/clean/user\_ratings\_clean.csv}
+    \item \texttt{data/clean/user\_preferences\_clean.csv}
+    \item \texttt{data/clean/user\_friendships\_clean.csv}
+\end{itemize}
+
+\section{Modelado del grafo}
+
+\subsection{Etiquetas de nodos}
+
+El modelo incluye las siguientes etiquetas:
+
+\begin{itemize}
+    \item Movie.
+    \item User.
+    \item Genre.
+    \item Director.
+\end{itemize}
+
+\subsection{Relaciones principales}
+
+\begin{itemize}
+    \item \texttt{DIRECTED}: director hacia película.
+    \item \texttt{HAS\_GENRE}: película hacia género.
+    \item \texttt{VIEWED}: usuario hacia película.
+    \item \texttt{RATED}: usuario hacia película.
+    \item \texttt{PREFERS}: usuario hacia género.
+    \item \texttt{FRIEND\_OF}: relación entre usuarios.
+\end{itemize}
+
+\subsection{Propiedades clave}
+
+\begin{itemize}
+    \item Texto: títulos, nombres, comentarios, idiomas.
+    \item Número: presupuesto, revenue, rating, progress, popularity.
+    \item Booleano: premium.
+    \item Listas: favorite\_languages, preferred\_genres.
+    \item Fechas: release\_date, register\_date, view\_date, rating\_date.
+\end{itemize}
+
+\section{Limpieza y preparación de datos}
+
+Se aplicó una limpieza ligera orientada a asegurar compatibilidad con Neo4j y consistencia durante la carga:
+
+\begin{itemize}
+    \item Normalización de espacios en blanco.
+    \item Conversión de campos numéricos y fechas.
+    \item Eliminación de duplicados exactos.
+    \item Filtrado de identificadores inválidos.
+    \item Control de rangos para puntuaciones y porcentajes.
+\end{itemize}
+
+\section{Carga de datos}
+
+La carga se automatizó con Python usando el driver oficial de Neo4j. El proceso siguió este orden:
+
+\begin{enumerate}
+    \item Creación de constraints.
+    \item Carga de nodos Movie, User y Director.
+    \item Carga de relaciones DIRECTED, HAS\_GENRE, VIEWED, RATED, PREFERS y FRIEND\_OF.
+    \item Validación posterior a la carga.
+\end{enumerate}
+
+\section{Resultados de la carga}
+
+La carga final quedó con el siguiente resumen:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lr}
+\toprule
+\textbf{Elemento} & \textbf{Cantidad} \\
+\midrule
+Movie & 4803 \\
+User & 2200 \\
+Genre & 19 \\
+Director & 2350 \\
+\midrule
+Total nodos & 9372 \\
+Total relaciones & 90879 \\
+\bottomrule
+\end{tabular}
+\caption{Conteo final de nodos y relaciones}
+\end{table}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lr}
+\toprule
+\textbf{Relación} & \textbf{Cantidad} \\
+\midrule
+DIRECTED & 4803 \\
+HAS\_GENRE & 12113 \\
+VIEWED & 36304 \\
+RATED & 19999 \\
+PREFERS & 6668 \\
+FRIEND\_OF & 21984 \\
+\bottomrule
+\end{tabular}
+\caption{Conteo final de relaciones}
+\end{table}
+
+\section{Validación post carga}
+
+La validación formal posterior a la carga se ejecutó exitosamente con estado PASS. El reporte generado confirmó lo siguiente:
+
+\begin{itemize}
+    \item No existen películas sin género.
+    \item No existen películas sin director.
+    \item No existen usuarios sin interacciones.
+    \item No existen nodos aislados.
+    \item El grafo es conexo desde el componente principal.
+\end{itemize}
+
+\subsection{Resumen de validación}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lr}
+\toprule
+\textbf{Control} & \textbf{Resultado} \\
+\midrule
+movies\_without\_genre & 0 \\
+movies\_without\_director & 0 \\
+users\_without\_interactions & 0 \\
+isolated\_nodes & 0 \\
+\bottomrule
+\end{tabular}
+\caption{Controles de integridad}
+\end{table}
+
+\section{Estado actual del proyecto}
+
+A la fecha de esta redacción, el proyecto ya cuenta con:
+
+\begin{itemize}
+    \item Data principal cargada y validada.
+    \item Data sintética para usuarios e interacciones.
+    \item Script de limpieza de datos.
+    \item Script de carga a Neo4j AuraDB.
+    \item Script de validación post carga.
+\end{itemize}
+
+\section{Pendientes inmediatos}
+
+Los siguientes pasos serán:
+
+\begin{enumerate}
+    \item Definir y documentar consultas Cypher de demostración.
+    \item Implementar el backend mínimo de consulta y CRUD.
+    \item Incorporar el algoritmo de recomendación.
+    \item Preparar el guion de presentación final.
+    \item Completar la sección de diagramas y explicación formal del modelo.
+\end{enumerate}
+
+\section{Anexos}
+
+\subsection{Rutas de scripts}
+
+\begin{itemize}
+    \item \texttt{scripts/generate\_synthetic\_users\_interactions.py}
+    \item \texttt{scripts/preprocess\_data.py}
+    \item \texttt{scripts/load\_clean\_data\_to\_neo4j.py}
+    \item \texttt{scripts/validate\_post\_load.py}
+    \item \texttt{scripts/fix\_post\_load\_orphans.py}
+\end{itemize}
+
+\subsection{Reporte de validación}
+
+El detalle completo de la validación puede consultarse en \texttt{docs/reports/validation\_post\_load\_report.md}.
+
+\end{document}
