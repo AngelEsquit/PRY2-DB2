@@ -1,0 +1,27 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# OS/editor artifacts
+.DS_Store
+Thumbs.db
