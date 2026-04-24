@@ -48,7 +48,7 @@ Desarrollar una aplicación funcional que permita almacenar, consultar y manipul
 
 \section{Caso de uso}
 
-El caso de uso seleccionado es el de motor de recomendación. La base de datos representa películas, géneros, directores y usuarios simulados con sus vistas, calificaciones, preferencias y relaciones de amistad. Con esta estructura se pueden ejecutar consultas de filtrado, agregación, recomendaciones y validación de conectividad del grafo.
+El caso de uso seleccionado es el de motor de recomendación. La base de datos representa películas, géneros, directores, idiomas, colecciones y usuarios simulados con sus vistas, calificaciones, preferencias y relaciones de amistad. Con esta estructura se pueden ejecutar consultas de filtrado, agregación, recomendaciones y validación de conectividad del grafo.
 
 \section{Tecnologías utilizadas}
 
@@ -99,6 +99,8 @@ El modelo incluye las siguientes etiquetas:
     \item User.
     \item Genre.
     \item Director.
+    \item Language.
+    \item Collection.
 \end{itemize}
 
 \subsection{Relaciones principales}
@@ -106,6 +108,8 @@ El modelo incluye las siguientes etiquetas:
 \begin{itemize}
     \item \texttt{DIRECTED}: director hacia película.
     \item \texttt{HAS\_GENRE}: película hacia género.
+    \item \texttt{IN\_LANGUAGE}: película hacia idioma.
+    \item \texttt{CONTAINS}: colección hacia película.
     \item \texttt{VIEWED}: usuario hacia película.
     \item \texttt{RATED}: usuario hacia película.
     \item \texttt{PREFERS}: usuario hacia género.
@@ -140,8 +144,8 @@ La carga se automatizó con Python usando el driver oficial de Neo4j. El proceso
 
 \begin{enumerate}
     \item Creación de constraints.
-    \item Carga de nodos Movie, User y Director.
-    \item Carga de relaciones DIRECTED, HAS\_GENRE, VIEWED, RATED, PREFERS y FRIEND\_OF.
+    \item Carga de nodos Movie, User, Director, Language y Collection.
+    \item Carga de relaciones DIRECTED, HAS\_GENRE, IN\_LANGUAGE, CONTAINS, VIEWED, RATED, PREFERS y FRIEND\_OF.
     \item Validación posterior a la carga.
 \end{enumerate}
 
@@ -159,9 +163,11 @@ Movie & 4803 \\
 User & 2200 \\
 Genre & 19 \\
 Director & 2350 \\
+Language & 37 \\
+Collection & 19 \\
 \midrule
-Total nodos & 9372 \\
-Total relaciones & 90879 \\
+Total nodos & 9428 \\
+Total relaciones & 107767 \\
 \bottomrule
 \end{tabular}
 \caption{Conteo final de nodos y relaciones}
@@ -175,6 +181,8 @@ Total relaciones & 90879 \\
 \midrule
 DIRECTED & 4803 \\
 HAS\_GENRE & 12113 \\
+IN\_LANGUAGE & 4803 \\
+CONTAINS & 12085 \\
 VIEWED & 36304 \\
 RATED & 19999 \\
 PREFERS & 6668 \\
@@ -219,10 +227,12 @@ A la fecha de esta redacción, el proyecto ya cuenta con:
 
 \begin{itemize}
     \item Data principal cargada y validada.
+    \item Modelo extendido con labels \texttt{Language} y \texttt{Collection}.
     \item Data sintética para usuarios e interacciones.
     \item Script de limpieza de datos.
     \item Script de carga a Neo4j AuraDB.
     \item Script de validación post carga.
+    \item API CRUD para nodos y relaciones.
 \end{itemize}
 
 \section{Pendientes inmediatos}
@@ -231,10 +241,10 @@ Los siguientes pasos serán:
 
 \begin{enumerate}
     \item Definir y documentar consultas Cypher de demostración.
-    \item Implementar el backend mínimo de consulta y CRUD.
-    \item Incorporar el algoritmo de recomendación.
+    \item Incorporar un algoritmo de recomendación (content-based o colaborativo) como evidencia de data science.
+    \item Ampliar tipos de relaciones orientadas al caso de uso (por ejemplo \texttt{LIKED}, \texttt{WATCHLISTED}, \texttt{FOLLOWS\_DIRECTOR}, \texttt{CREATED}) para acercarse al objetivo del diseño.
     \item Preparar el guion de presentación final.
-    \item Completar la sección de diagramas y explicación formal del modelo.
+    \item Consolidar evidencias de pruebas de endpoints y consultas para la exposición.
 \end{enumerate}
 
 \section{Anexos}
@@ -251,6 +261,6 @@ Los siguientes pasos serán:
 
 \subsection{Reporte de validación}
 
-El detalle completo de la validación puede consultarse en \texttt{docs/reports/validation\_post\_load\_report.md}.
+El detalle completo de la validación puede consultarse en \texttt{validation\_post\_load\_report.md}.
 
 \end{document}

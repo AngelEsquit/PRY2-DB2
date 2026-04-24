@@ -150,12 +150,79 @@ def normalize_friendships(rows: List[Dict[str, str]]) -> List[Dict[str, object]]
     return out
 
 
+LANGUAGE_NAMES = {
+    "en": ("English", "Global", "Germanic", False),
+    "es": ("Spanish", "Latin America / Spain", "Romance", False),
+    "fr": ("French", "France / Francophone", "Romance", False),
+    "de": ("German", "Germany / German-speaking", "Germanic", False),
+    "it": ("Italian", "Italy / Italian-speaking", "Romance", False),
+    "pt": ("Portuguese", "Portugal / Brazil", "Romance", False),
+    "ja": ("Japanese", "Japan", "Japonic", False),
+    "ko": ("Korean", "Korea", "Koreanic", False),
+}
+
+
+def normalize_languages(movies: List[Dict[str, str]], users: List[Dict[str, str]]) -> List[Dict[str, object]]:
+    codes = set()
+
+    for movie in movies:
+        code = (movie.get("original_language") or "").strip().lower()
+        if code:
+            codes.add(code)
+
+    for user in users:
+        for code in (user.get("favorite_languages") or "").split("|"):
+            code = code.strip().lower()
+            if code:
+                codes.add(code)
+
+    out = []
+    for code in sorted(codes):
+        name, region, family, rtl = LANGUAGE_NAMES.get(code, (code.upper(), "Unknown", "Unknown", False))
+        out.append(
+            {
+                "code": code,
+                "name": name,
+                "region": region,
+                "family": family,
+                "rtl": rtl,
+            }
+        )
+    return out
+
+
+def normalize_collections(movie_genres: List[Dict[str, str]]) -> List[Dict[str, object]]:
+    genre_counts: Dict[str, int] = {}
+    for row in movie_genres:
+        genre = (row.get("genre") or "").strip()
+        if not genre:
+            continue
+        genre_counts[genre] = genre_counts.get(genre, 0) + 1
+
+    out = []
+    for genre, count in sorted(genre_counts.items()):
+        collection_id = "COL_" + genre.lower().replace(" ", "_")
+        out.append(
+            {
+                "collection_id": collection_id,
+                "name": f"Collection - {genre}",
+                "created_at": None,
+                "public": True,
+                "followers_count": count,
+                "genre": genre,
+            }
+        )
+    return out
+
+
 def create_constraints(session):
     stmts = [
         "CREATE CONSTRAINT movie_id_unique IF NOT EXISTS FOR (m:Movie) REQUIRE m.movie_id IS UNIQUE",
         "CREATE CONSTRAINT user_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.user_id IS UNIQUE",
         "CREATE CONSTRAINT genre_name_unique IF NOT EXISTS FOR (g:Genre) REQUIRE g.name IS UNIQUE",
         "CREATE CONSTRAINT director_id_unique IF NOT EXISTS FOR (d:Director) REQUIRE d.director_id IS UNIQUE",
+        "CREATE CONSTRAINT language_code_unique IF NOT EXISTS FOR (l:Language) REQUIRE l.code IS UNIQUE",
+        "CREATE CONSTRAINT collection_id_unique IF NOT EXISTS FOR (c:Collection) REQUIRE c.collection_id IS UNIQUE",
     ]
     for stmt in stmts:
         session.run(stmt)
@@ -196,6 +263,8 @@ def main():
     movies = normalize_movies(movies_raw)
     movie_genres = normalize_movie_genres(movie_genres_raw)
     users = normalize_users(users_raw)
+    languages = normalize_languages(movies_raw, users_raw)
+    collections = normalize_collections(movie_genres_raw)
     views = normalize_views(views_raw)
     ratings = normalize_ratings(ratings_raw)
     preferences = normalize_preferences(preferences_raw)
@@ -207,6 +276,8 @@ def main():
     print(f"- movies: {len(movies)}")
     print(f"- genres links: {len(movie_genres)}")
     print(f"- users: {len(users)}")
+    print(f"- languages: {len(languages)}")
+    print(f"- collections: {len(collections)}")
     print(f"- views: {len(views)}")
     print(f"- ratings: {len(ratings)}")
     print(f"- preferences: {len(preferences)}")
@@ -259,6 +330,24 @@ def main():
     SET d.name = row.name
     """
 
+    query_languages = """
+    UNWIND $rows AS row
+    MERGE (l:Language {code: row.code})
+    SET l.name = row.name,
+        l.region = row.region,
+        l.family = row.family,
+        l.rtl = row.rtl
+    """
+
+    query_collections = """
+    UNWIND $rows AS row
+    MERGE (c:Collection {collection_id: row.collection_id})
+    SET c.name = row.name,
+        c.created_at = date(),
+        c.public = row.public,
+        c.followers_count = row.followers_count
+    """
+
     query_directed_by = """
     UNWIND $rows AS row
     MATCH (d:Director {director_id: row.director_id})
@@ -275,6 +364,24 @@ def main():
     MATCH (m:Movie {movie_id: row.movie_id})
     MERGE (m)-[r:HAS_GENRE]->(g)
     SET r.source = 'movies_clean',
+        r.last_updated = date()
+    """
+
+    query_language_rel = """
+    UNWIND $rows AS row
+    MATCH (m:Movie {movie_id: row.movie_id})
+    MATCH (l:Language {code: row.code})
+    MERGE (m)-[r:IN_LANGUAGE]->(l)
+    SET r.source = 'movies_clean',
+        r.last_updated = date()
+    """
+
+    query_collection_rel = """
+    UNWIND $rows AS row
+    MATCH (c:Collection {collection_id: row.collection_id})
+    MATCH (m:Movie {movie_id: row.movie_id})
+    MERGE (c)-[r:CONTAINS]->(m)
+    SET r.source = 'genre_grouping',
         r.last_updated = date()
     """
 
@@ -325,10 +432,24 @@ def main():
         run_batched_write(session, query_movies, movies, args.batch_size, "movies")
         run_batched_write(session, query_users, users, args.batch_size, "users")
         run_batched_write(session, query_directors, directors, args.batch_size, "directors")
+        run_batched_write(session, query_languages, languages, args.batch_size, "languages")
+        run_batched_write(session, query_collections, collections, args.batch_size, "collections")
 
         print("Loading relationships...")
         run_batched_write(session, query_directed_by, directed_by, args.batch_size, "directed_by")
         run_batched_write(session, query_genre_rel, movie_genres, args.batch_size, "movie_genres")
+        language_rows = [
+            {"movie_id": row["movie_id"], "code": (row.get("original_language") or "").strip().lower()}
+            for row in movies_raw
+            if row.get("movie_id") and (row.get("original_language") or "").strip()
+        ]
+        collection_rows = [
+            {"collection_id": "COL_" + row["genre"].lower().replace(" ", "_"), "movie_id": row["movie_id"]}
+            for row in movie_genres_raw
+            if row.get("movie_id") and row.get("genre")
+        ]
+        run_batched_write(session, query_language_rel, language_rows, args.batch_size, "movie_languages")
+        run_batched_write(session, query_collection_rel, collection_rows, args.batch_size, "collections")
         run_batched_write(session, query_views, views, args.batch_size, "views")
         run_batched_write(session, query_ratings, ratings, args.batch_size, "ratings")
         run_batched_write(session, query_preferences, preferences, args.batch_size, "preferences")
@@ -340,12 +461,16 @@ def main():
             "users": "MATCH (u:User) RETURN count(u) AS c",
             "genres": "MATCH (g:Genre) RETURN count(g) AS c",
             "directors": "MATCH (d:Director) RETURN count(d) AS c",
+            "languages": "MATCH (l:Language) RETURN count(l) AS c",
+            "collections": "MATCH (c:Collection) RETURN count(c) AS c",
             "viewed": "MATCH ()-[r:VIEWED]->() RETURN count(r) AS c",
             "rated": "MATCH ()-[r:RATED]->() RETURN count(r) AS c",
             "prefers": "MATCH ()-[r:PREFERS]->() RETURN count(r) AS c",
             "friend_of": "MATCH ()-[r:FRIEND_OF]-() RETURN count(r) AS c",
             "has_genre": "MATCH ()-[r:HAS_GENRE]->() RETURN count(r) AS c",
             "directed": "MATCH ()-[r:DIRECTED]->() RETURN count(r) AS c",
+            "in_language": "MATCH ()-[r:IN_LANGUAGE]->() RETURN count(r) AS c",
+            "contains": "MATCH ()-[r:CONTAINS]->() RETURN count(r) AS c",
         }
 
         for name, stmt in checks.items():

@@ -40,6 +40,8 @@ Proyecto de Bases de Datos 2 orientado a un motor de recomendacion con Neo4j Aur
 
 ### 3) Cargar en Neo4j AuraDB
 
+Este paso crea y relaciona los labels principales del modelo, incluyendo `Language` y `Collection`.
+
 ```powershell
 & "c:/Users/aeeh2/Documents/Universidad/Semestre 7/BasesdeDatos2/PRY2-DB2/.venv/Scripts/python.exe" "scripts/load_clean_data_to_neo4j.py"
 ```

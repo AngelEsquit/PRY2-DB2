@@ -13,6 +13,8 @@ NODE_QUERIES = OrderedDict(
         ("User", "MATCH (n:User) RETURN count(n) AS c"),
         ("Genre", "MATCH (n:Genre) RETURN count(n) AS c"),
         ("Director", "MATCH (n:Director) RETURN count(n) AS c"),
+        ("Language", "MATCH (n:Language) RETURN count(n) AS c"),
+        ("Collection", "MATCH (n:Collection) RETURN count(n) AS c"),
     ]
 )
 
@@ -20,6 +22,8 @@ REL_QUERIES = OrderedDict(
     [
         ("DIRECTED", "MATCH ()-[r:DIRECTED]->() RETURN count(r) AS c"),
         ("HAS_GENRE", "MATCH ()-[r:HAS_GENRE]->() RETURN count(r) AS c"),
+        ("IN_LANGUAGE", "MATCH ()-[r:IN_LANGUAGE]->() RETURN count(r) AS c"),
+        ("CONTAINS", "MATCH ()-[r:CONTAINS]->() RETURN count(r) AS c"),
         ("VIEWED", "MATCH ()-[r:VIEWED]->() RETURN count(r) AS c"),
         ("RATED", "MATCH ()-[r:RATED]->() RETURN count(r) AS c"),
         ("PREFERS", "MATCH ()-[r:PREFERS]->() RETURN count(r) AS c"),
