@@ -1,6 +1,8 @@
 import argparse
 import csv
 import os
+import random
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, List
 
@@ -215,6 +217,251 @@ def normalize_collections(movie_genres: List[Dict[str, str]]) -> List[Dict[str, 
     return out
 
 
+def _safe_date(date_text: str, fallback: date) -> date:
+    if not date_text:
+        return fallback
+    try:
+        return datetime.strptime(date_text, "%Y-%m-%d").date()
+    except ValueError:
+        return fallback
+
+
+def build_additional_relationship_data(
+    users: List[Dict[str, object]],
+    movies_raw: List[Dict[str, str]],
+    movie_genres_raw: List[Dict[str, str]],
+    views: List[Dict[str, object]],
+    ratings: List[Dict[str, object]],
+) -> Dict[str, List[Dict[str, object]]]:
+    rng = random.Random(42)
+    today = date.today()
+
+    movie_ids = [row["movie_id"] for row in movies_raw if row.get("movie_id")]
+    movie_director: Dict[str, str] = {}
+    for row in movies_raw:
+        movie_id = row.get("movie_id")
+        director = (row.get("director") or "").strip()
+        if movie_id and director:
+            movie_director[movie_id] = "D_" + director.lower().replace(" ", "_")
+
+    movie_genres_map: Dict[str, set] = {}
+    genre_names: set = set()
+    for row in movie_genres_raw:
+        movie_id = row.get("movie_id")
+        genre = row.get("genre")
+        if not movie_id or not genre:
+            continue
+        movie_genres_map.setdefault(movie_id, set()).add(genre)
+        genre_names.add(genre)
+
+    viewed_by_user: Dict[str, set] = {}
+    for row in views:
+        viewed_by_user.setdefault(str(row["user_id"]), set()).add(str(row["movie_id"]))
+
+    rated_by_user: Dict[str, set] = {}
+    likes_seed = []
+    for row in ratings:
+        user_id = str(row["user_id"])
+        movie_id = str(row["movie_id"])
+        rated_by_user.setdefault(user_id, set()).add(movie_id)
+        if float(row.get("rating") or 0) >= 8.0:
+            likes_seed.append(
+                {
+                    "user_id": user_id,
+                    "movie_id": movie_id,
+                    "liked_at": str(row.get("rating_date") or today.isoformat()),
+                    "strength": round(min(1.0, float(row.get("rating") or 8.0) / 10.0), 3),
+                    "source": "high_rating",
+                }
+            )
+
+    watchlisted_rows: List[Dict[str, object]] = []
+    liked_rows: List[Dict[str, object]] = likes_seed[:]
+    follows_rows: List[Dict[str, object]] = []
+    created_rows: List[Dict[str, object]] = []
+    user_collections: List[Dict[str, object]] = []
+    user_collection_contains_rows: List[Dict[str, object]] = []
+
+    liked_seen = {(row["user_id"], row["movie_id"]) for row in liked_rows}
+
+    for user in users:
+        user_id = str(user["user_id"])
+        register_date = _safe_date(str(user.get("register_date") or ""), today - timedelta(days=365))
+        preferred_genres = set(user.get("preferred_genres") or [])
+        seen_movies = viewed_by_user.get(user_id, set()) | rated_by_user.get(user_id, set())
+
+        # WATCHLISTED: unseen movies aligned with preferred genres.
+        candidates = []
+        for movie_id in movie_ids:
+            if movie_id in seen_movies:
+                continue
+            genres = movie_genres_map.get(movie_id, set())
+            score = len(preferred_genres.intersection(genres))
+            if score > 0:
+                candidates.append((movie_id, score))
+        candidates.sort(key=lambda x: (-x[1], x[0]))
+        watchlist_size = min(6, max(2, len(candidates) // 400 + 2))
+        for rank, (movie_id, _score) in enumerate(candidates[:watchlist_size], start=1):
+            added_at = register_date + timedelta(days=rng.randint(15, 1200))
+            if added_at > today:
+                added_at = today
+            watchlisted_rows.append(
+                {
+                    "user_id": user_id,
+                    "movie_id": movie_id,
+                    "added_at": added_at.isoformat(),
+                    "priority": rank,
+                    "source": "genre_match",
+                }
+            )
+
+        # LIKED: derive additional likes from deep views when no high rating exists.
+        for row in views:
+            if str(row["user_id"]) != user_id:
+                continue
+            if float(row.get("progress") or 0) < 0.95:
+                continue
+            key = (user_id, str(row["movie_id"]))
+            if key in liked_seen:
+                continue
+            liked_seen.add(key)
+            liked_rows.append(
+                {
+                    "user_id": user_id,
+                    "movie_id": str(row["movie_id"]),
+                    "liked_at": str(row.get("view_date") or today.isoformat()),
+                    "strength": round(0.6 + 0.4 * float(row.get("progress") or 1.0), 3),
+                    "source": "high_completion",
+                }
+            )
+
+        # FOLLOWS_DIRECTOR: top directors from liked movies.
+        director_counts: Dict[str, int] = {}
+        for like in liked_rows:
+            if like["user_id"] != user_id:
+                continue
+            director_id = movie_director.get(str(like["movie_id"]))
+            if not director_id:
+                continue
+            director_counts[director_id] = director_counts.get(director_id, 0) + 1
+        top_directors = sorted(director_counts.items(), key=lambda kv: (-kv[1], kv[0]))[:3]
+        for director_id, count in top_directors:
+            since_date = register_date + timedelta(days=rng.randint(30, 900))
+            if since_date > today:
+                since_date = today
+            follows_rows.append(
+                {
+                    "user_id": user_id,
+                    "director_id": director_id,
+                    "since_date": since_date.isoformat(),
+                    "affinity": round(min(1.0, 0.35 + 0.15 * count), 3),
+                    "source": "liked_movies",
+                }
+            )
+
+        # User collections for recommendation and social use cases.
+        liked_movies = [row["movie_id"] for row in liked_rows if row["user_id"] == user_id][:20]
+        watchlist_movies = [row["movie_id"] for row in watchlisted_rows if row["user_id"] == user_id][:20]
+
+        # Keep collections non-empty even for low-activity users.
+        if not liked_movies:
+            fallback_seen = sorted(seen_movies)
+            if fallback_seen:
+                liked_movies = fallback_seen[:1]
+            elif movie_ids:
+                liked_movies = [movie_ids[0]]
+        if not watchlist_movies:
+            unseen = [m for m in movie_ids if m not in seen_movies]
+            if unseen:
+                watchlist_movies = unseen[:1]
+            elif movie_ids:
+                watchlist_movies = [movie_ids[-1]]
+
+        fav_collection_id = f"COL_U_{user_id}_FAV"
+        watch_collection_id = f"COL_U_{user_id}_WATCH"
+
+        user_collections.append(
+            {
+                "collection_id": fav_collection_id,
+                "name": f"{user_id} Favorites",
+                "created_at": register_date.isoformat(),
+                "public": bool(user.get("premium", False)),
+                "followers_count": rng.randint(0, 40),
+                "genre": "",
+            }
+        )
+        user_collections.append(
+            {
+                "collection_id": watch_collection_id,
+                "name": f"{user_id} Watchlist",
+                "created_at": register_date.isoformat(),
+                "public": False,
+                "followers_count": 0,
+                "genre": "",
+            }
+        )
+
+        created_rows.append(
+            {
+                "user_id": user_id,
+                "collection_id": fav_collection_id,
+                "created_at": register_date.isoformat(),
+                "title": "favorites",
+                "public": bool(user.get("premium", False)),
+            }
+        )
+        created_rows.append(
+            {
+                "user_id": user_id,
+                "collection_id": watch_collection_id,
+                "created_at": register_date.isoformat(),
+                "title": "watchlist",
+                "public": False,
+            }
+        )
+
+        for movie_id in liked_movies:
+            user_collection_contains_rows.append(
+                {
+                    "collection_id": fav_collection_id,
+                    "movie_id": movie_id,
+                    "source": "liked_seed",
+                }
+            )
+        for movie_id in watchlist_movies:
+            user_collection_contains_rows.append(
+                {
+                    "collection_id": watch_collection_id,
+                    "movie_id": movie_id,
+                    "source": "watchlist_seed",
+                }
+            )
+
+    # Assign a creator to global genre collections using a stable existing user.
+    owner_user_id = str(users[0]["user_id"]) if users else None
+    if owner_user_id:
+        for genre in sorted(genre_names):
+            collection_id = "COL_" + genre.lower().replace(" ", "_")
+            created_rows.append(
+                {
+                    "user_id": owner_user_id,
+                    "collection_id": collection_id,
+                    "created_at": today.isoformat(),
+                    "title": "genre_catalog",
+                    "public": True,
+                }
+            )
+
+    return {
+        "watchlisted": watchlisted_rows,
+        "liked": liked_rows,
+        "follows_director": follows_rows,
+        "created": created_rows,
+        "user_collections": user_collections,
+        "user_collection_contains": user_collection_contains_rows,
+    }
+
+
 def create_constraints(session):
     stmts = [
         "CREATE CONSTRAINT movie_id_unique IF NOT EXISTS FOR (m:Movie) REQUIRE m.movie_id IS UNIQUE",
@@ -271,6 +518,8 @@ def main():
     friendships = normalize_friendships(friendships_raw)
     directors = normalize_directors(movies_raw)
     directed_by = normalize_directed_by(movies_raw)
+    additional = build_additional_relationship_data(users, movies_raw, movie_genres_raw, views, ratings)
+    collections.extend(additional["user_collections"])
 
     print("Prepared records:")
     print(f"- movies: {len(movies)}")
@@ -284,6 +533,10 @@ def main():
     print(f"- friendships: {len(friendships)}")
     print(f"- directors: {len(directors)}")
     print(f"- directed_by: {len(directed_by)}")
+    print(f"- watchlisted: {len(additional['watchlisted'])}")
+    print(f"- liked: {len(additional['liked'])}")
+    print(f"- follows_director: {len(additional['follows_director'])}")
+    print(f"- created: {len(additional['created'])}")
 
     if args.dry_run:
         print("Dry-run mode: no writes executed.")
@@ -343,7 +596,7 @@ def main():
     UNWIND $rows AS row
     MERGE (c:Collection {collection_id: row.collection_id})
     SET c.name = row.name,
-        c.created_at = date(),
+        c.created_at = CASE WHEN row.created_at IS NULL THEN date() ELSE date(row.created_at) END,
         c.public = row.public,
         c.followers_count = row.followers_count
     """
@@ -381,8 +634,48 @@ def main():
     MATCH (c:Collection {collection_id: row.collection_id})
     MATCH (m:Movie {movie_id: row.movie_id})
     MERGE (c)-[r:CONTAINS]->(m)
-    SET r.source = 'genre_grouping',
+    SET r.source = COALESCE(row.source, 'genre_grouping'),
         r.last_updated = date()
+    """
+
+    query_watchlisted = """
+    UNWIND $rows AS row
+    MATCH (u:User {user_id: row.user_id})
+    MATCH (m:Movie {movie_id: row.movie_id})
+    MERGE (u)-[r:WATCHLISTED {movie_id: row.movie_id}]->(m)
+    SET r.added_at = date(row.added_at),
+        r.priority = row.priority,
+        r.source = row.source
+    """
+
+    query_liked = """
+    UNWIND $rows AS row
+    MATCH (u:User {user_id: row.user_id})
+    MATCH (m:Movie {movie_id: row.movie_id})
+    MERGE (u)-[r:LIKED {movie_id: row.movie_id}]->(m)
+    SET r.liked_at = date(row.liked_at),
+        r.strength = row.strength,
+        r.source = row.source
+    """
+
+    query_follows_director = """
+    UNWIND $rows AS row
+    MATCH (u:User {user_id: row.user_id})
+    MATCH (d:Director {director_id: row.director_id})
+    MERGE (u)-[r:FOLLOWS_DIRECTOR]->(d)
+    SET r.since_date = date(row.since_date),
+        r.affinity = row.affinity,
+        r.source = row.source
+    """
+
+    query_created_collection = """
+    UNWIND $rows AS row
+    MATCH (u:User {user_id: row.user_id})
+    MATCH (c:Collection {collection_id: row.collection_id})
+    MERGE (u)-[r:CREATED]->(c)
+    SET r.created_at = date(row.created_at),
+        r.title = row.title,
+        r.public = row.public
     """
 
     query_views = """
@@ -444,16 +737,25 @@ def main():
             if row.get("movie_id") and (row.get("original_language") or "").strip()
         ]
         collection_rows = [
-            {"collection_id": "COL_" + row["genre"].lower().replace(" ", "_"), "movie_id": row["movie_id"]}
+            {
+                "collection_id": "COL_" + row["genre"].lower().replace(" ", "_"),
+                "movie_id": row["movie_id"],
+                "source": "genre_grouping",
+            }
             for row in movie_genres_raw
             if row.get("movie_id") and row.get("genre")
         ]
+        collection_rows.extend(additional["user_collection_contains"])
         run_batched_write(session, query_language_rel, language_rows, args.batch_size, "movie_languages")
         run_batched_write(session, query_collection_rel, collection_rows, args.batch_size, "collections")
         run_batched_write(session, query_views, views, args.batch_size, "views")
         run_batched_write(session, query_ratings, ratings, args.batch_size, "ratings")
         run_batched_write(session, query_preferences, preferences, args.batch_size, "preferences")
         run_batched_write(session, query_friendships, friendships, args.batch_size, "friendships")
+        run_batched_write(session, query_watchlisted, additional["watchlisted"], args.batch_size, "watchlisted")
+        run_batched_write(session, query_liked, additional["liked"], args.batch_size, "liked")
+        run_batched_write(session, query_follows_director, additional["follows_director"], args.batch_size, "follows")
+        run_batched_write(session, query_created_collection, additional["created"], args.batch_size, "created")
 
         print("Running validation counts...")
         checks = {
@@ -471,6 +773,10 @@ def main():
             "directed": "MATCH ()-[r:DIRECTED]->() RETURN count(r) AS c",
             "in_language": "MATCH ()-[r:IN_LANGUAGE]->() RETURN count(r) AS c",
             "contains": "MATCH ()-[r:CONTAINS]->() RETURN count(r) AS c",
+            "watchlisted": "MATCH ()-[r:WATCHLISTED]->() RETURN count(r) AS c",
+            "liked": "MATCH ()-[r:LIKED]->() RETURN count(r) AS c",
+            "follows_director": "MATCH ()-[r:FOLLOWS_DIRECTOR]->() RETURN count(r) AS c",
+            "created": "MATCH ()-[r:CREATED]->() RETURN count(r) AS c",
         }
 
         for name, stmt in checks.items():

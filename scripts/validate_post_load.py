@@ -28,6 +28,10 @@ REL_QUERIES = OrderedDict(
         ("RATED", "MATCH ()-[r:RATED]->() RETURN count(r) AS c"),
         ("PREFERS", "MATCH ()-[r:PREFERS]->() RETURN count(r) AS c"),
         ("FRIEND_OF", "MATCH ()-[r:FRIEND_OF]-() RETURN count(r) AS c"),
+        ("WATCHLISTED", "MATCH ()-[r:WATCHLISTED]->() RETURN count(r) AS c"),
+        ("LIKED", "MATCH ()-[r:LIKED]->() RETURN count(r) AS c"),
+        ("FOLLOWS_DIRECTOR", "MATCH ()-[r:FOLLOWS_DIRECTOR]->() RETURN count(r) AS c"),
+        ("CREATED", "MATCH ()-[r:CREATED]->() RETURN count(r) AS c"),
     ]
 )
 
@@ -48,6 +52,14 @@ CHECK_QUERIES = OrderedDict(
         (
             "isolated_nodes",
             "MATCH (n) WHERE NOT (n)--() RETURN count(n) AS c",
+        ),
+        (
+            "collections_without_creator",
+            "MATCH (c:Collection) WHERE NOT (:User)-[:CREATED]->(c) RETURN count(c) AS c",
+        ),
+        (
+            "collections_without_movies",
+            "MATCH (c:Collection) WHERE NOT (c)-[:CONTAINS]->(:Movie) RETURN count(c) AS c",
         ),
     ]
 )
@@ -153,6 +165,12 @@ def main():
     if checks["isolated_nodes"] > 0:
         passed = False
         failures.append(f"Nodos aislados: {checks['isolated_nodes']}")
+    if checks["collections_without_creator"] > 0:
+        passed = False
+        failures.append(f"Colecciones sin creador: {checks['collections_without_creator']}")
+    if checks["collections_without_movies"] > 0:
+        passed = False
+        failures.append(f"Colecciones sin películas: {checks['collections_without_movies']}")
     if connectivity["unreachable_others"] > 0:
         passed = False
         failures.append(f"Nodos no alcanzables desde el seed: {connectivity['unreachable_others']}")
