@@ -64,9 +64,55 @@ CHECK_QUERIES = OrderedDict(
     ]
 )
 
+MIN_NODE_PROPS = OrderedDict(
+    [
+        ("Movie", 5),
+        ("User", 5),
+        ("Genre", 5),
+        ("Director", 5),
+        ("Language", 5),
+        ("Collection", 5),
+    ]
+)
+
+MIN_REL_PROPS = OrderedDict(
+    [
+        ("DIRECTED", 3),
+        ("HAS_GENRE", 3),
+        ("IN_LANGUAGE", 3),
+        ("CONTAINS", 3),
+        ("VIEWED", 3),
+        ("RATED", 3),
+        ("PREFERS", 3),
+        ("FRIEND_OF", 3),
+        ("WATCHLISTED", 3),
+        ("LIKED", 3),
+        ("FOLLOWS_DIRECTOR", 3),
+        ("CREATED", 3),
+    ]
+)
+
 
 def run_scalar(session, query: str):
     return session.run(query).single()["c"]
+
+
+def count_nodes_below_property_threshold(session, label: str, min_props: int) -> int:
+    query = f"""
+    MATCH (n:{label})
+    WHERE size(keys(n)) < $min_props
+    RETURN count(n) AS c
+    """
+    return session.run(query, min_props=min_props).single()["c"]
+
+
+def count_relationships_below_property_threshold(session, rel_type: str, min_props: int) -> int:
+    query = f"""
+    MATCH ()-[r:{rel_type}]-()
+    WHERE size(keys(r)) < $min_props
+    RETURN count(r) AS c
+    """
+    return session.run(query, min_props=min_props).single()["c"]
 
 
 def pick_seed_node(session):
@@ -143,6 +189,14 @@ def main():
         node_counts = OrderedDict((name, run_scalar(session, query)) for name, query in NODE_QUERIES.items())
         rel_counts = OrderedDict((name, run_scalar(session, query)) for name, query in REL_QUERIES.items())
         checks = OrderedDict((name, run_scalar(session, query)) for name, query in CHECK_QUERIES.items())
+        node_property_checks = OrderedDict(
+            (label, count_nodes_below_property_threshold(session, label, min_props))
+            for label, min_props in MIN_NODE_PROPS.items()
+        )
+        rel_property_checks = OrderedDict(
+            (rel_type, count_relationships_below_property_threshold(session, rel_type, min_props))
+            for rel_type, min_props in MIN_REL_PROPS.items()
+        )
         connectivity = connectivity_check(session)
 
     driver.close()
@@ -171,6 +225,14 @@ def main():
     if checks["collections_without_movies"] > 0:
         passed = False
         failures.append(f"Colecciones sin películas: {checks['collections_without_movies']}")
+    for label, count in node_property_checks.items():
+        if count > 0:
+            passed = False
+            failures.append(f"Nodos {label} con menos de {MIN_NODE_PROPS[label]} propiedades: {count}")
+    for rel_type, count in rel_property_checks.items():
+        if count > 0:
+            passed = False
+            failures.append(f"Relaciones {rel_type} con menos de {MIN_REL_PROPS[rel_type]} propiedades: {count}")
     if connectivity["unreachable_others"] > 0:
         passed = False
         failures.append(f"Nodos no alcanzables desde el seed: {connectivity['unreachable_others']}")
@@ -204,6 +266,18 @@ def main():
     for name, count in checks.items():
         lines.append(f"- {name}: {count}")
     lines.append("")
+    lines.append("## Validación de propiedades mínimas")
+    lines.append("")
+    lines.append("### Nodos con menos propiedades de las requeridas")
+    lines.append("")
+    for label, count in node_property_checks.items():
+        lines.append(f"- {label} (< {MIN_NODE_PROPS[label]} props): {count}")
+    lines.append("")
+    lines.append("### Relaciones con menos propiedades de las requeridas")
+    lines.append("")
+    for rel_type, count in rel_property_checks.items():
+        lines.append(f"- {rel_type} (< {MIN_REL_PROPS[rel_type]} props): {count}")
+    lines.append("")
     lines.append("## Conectividad")
     lines.append("")
     lines.append(f"- Seed elegido: {connectivity['seed_repr']} {connectivity['seed_labels']}")
@@ -233,6 +307,10 @@ def main():
         print(f"[REL] {rel}: {count}")
     for name, count in checks.items():
         print(f"[CHECK] {name}: {count}")
+    for label, count in node_property_checks.items():
+        print(f"[NODE_PROPS] {label} (<{MIN_NODE_PROPS[label]}): {count}")
+    for rel_type, count in rel_property_checks.items():
+        print(f"[REL_PROPS] {rel_type} (<{MIN_REL_PROPS[rel_type]}): {count}")
     print(
         f"[CONNECTIVITY] seed={connectivity['seed_repr']} labels={connectivity['seed_labels']} "
         f"reachable={connectivity['reachable_others']} unreachable={connectivity['unreachable_others']}"
