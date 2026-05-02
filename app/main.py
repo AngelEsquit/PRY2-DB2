@@ -1063,6 +1063,45 @@ def get_similar_users(user_id: str, top_k: int = 10, min_similarity: float = 0.0
     return {"user_id": user_id, "total": len(results[:top_k]), "items": results[:top_k]}
 
 
+@app.get("/movies/{movie_id}", tags=["movies"])
+def get_movie(movie_id: str):
+    """
+    Retorna el detalle de una pelicula por movie_id.
+    """
+    with driver.session(database=NEO4J_DATABASE) as session:
+        row = session.run(
+            """
+            MATCH (m:Movie {movie_id: $mid})
+            OPTIONAL MATCH (m)-[:HAS_GENRE]->(g:Genre)
+            OPTIONAL MATCH (m)-[:IN_LANGUAGE]->(l:Language)
+            OPTIONAL MATCH (d:Director)-[:DIRECTED]->(m)
+            RETURN
+                m.movie_id AS movie_id,
+                m.title AS title,
+                m.original_title AS original_title,
+                m.overview AS overview,
+                m.release_date AS release_date,
+                m.runtime AS runtime,
+                m.original_language AS original_language,
+                m.status AS status,
+                m.vote_average AS vote_average,
+                m.vote_count AS vote_count,
+                m.popularity AS popularity,
+                m.budget AS budget,
+                m.revenue AS revenue,
+                collect(DISTINCT g.name) AS genres,
+                collect(DISTINCT l.code) AS languages,
+                collect(DISTINCT d.name) AS directors
+            """,
+            mid=movie_id,
+        ).single()
+
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Movie '{movie_id}' not found")
+
+    return dict(row)
+
+
 @app.get("/movies/{movie_id}/similar", tags=["similarity"])
 def get_similar_movies(movie_id: str, top_k: int = 10):
     """
