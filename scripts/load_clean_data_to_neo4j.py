@@ -1,5 +1,6 @@
 import argparse
 import csv
+import hashlib
 import os
 import random
 from datetime import date, datetime, timedelta
@@ -73,11 +74,39 @@ def normalize_movie_genres(rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
 
 def normalize_directors(movies: List[Dict[str, str]]) -> List[Dict[str, str]]:
     unique = {}
+    nationalities = [
+        "US",
+        "MX",
+        "GT",
+        "ES",
+        "AR",
+        "CO",
+        "CL",
+        "FR",
+        "DE",
+        "IT",
+    ]
+
+    def _stable_int(seed: str, modulo: int) -> int:
+        raw = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:8]
+        return int(raw, 16) % modulo
+
     for m in movies:
         d = (m.get("director") or "").strip()
         if d:
             director_id = "D_" + d.lower().replace(" ", "_")
-            unique[director_id] = {"director_id": director_id, "name": d}
+            idx = _stable_int(director_id, len(nationalities))
+            birth_year = 1945 + _stable_int(director_id + "_birth", 45)
+            birth_month = 1 + _stable_int(director_id + "_month", 12)
+            birth_day = 1 + _stable_int(director_id + "_day", 28)
+            unique[director_id] = {
+                "director_id": director_id,
+                "name": d,
+                "nationality": nationalities[idx],
+                "birth_date": f"{birth_year:04d}-{birth_month:02d}-{birth_day:02d}",
+                "active": _stable_int(director_id + "_active", 10) >= 2,
+                "style_tags": ["cinema", "feature", f"region_{nationalities[idx].lower()}"],
+            }
     return list(unique.values())
 
 
@@ -212,6 +241,31 @@ def normalize_collections(movie_genres: List[Dict[str, str]]) -> List[Dict[str, 
                 "public": True,
                 "followers_count": count,
                 "genre": genre,
+            }
+        )
+    return out
+
+
+def normalize_genres(movie_genres: List[Dict[str, str]]) -> List[Dict[str, object]]:
+    counts: Dict[str, int] = {}
+    for row in movie_genres:
+        genre = (row.get("genre") or "").strip()
+        if genre:
+            counts[genre] = counts.get(genre, 0) + 1
+
+    if not counts:
+        return []
+
+    max_count = max(counts.values())
+    out: List[Dict[str, object]] = []
+    for genre, count in sorted(counts.items()):
+        out.append(
+            {
+                "name": genre,
+                "description": f"Titles categorized as {genre}",
+                "popularity_index": round(count / max_count, 4),
+                "active": True,
+                "created_at": None,
             }
         )
     return out
@@ -509,6 +563,7 @@ def main():
 
     movies = normalize_movies(movies_raw)
     movie_genres = normalize_movie_genres(movie_genres_raw)
+    genres = normalize_genres(movie_genres_raw)
     users = normalize_users(users_raw)
     languages = normalize_languages(movies_raw, users_raw)
     collections = normalize_collections(movie_genres_raw)
@@ -524,6 +579,7 @@ def main():
     print("Prepared records:")
     print(f"- movies: {len(movies)}")
     print(f"- genres links: {len(movie_genres)}")
+    print(f"- genres: {len(genres)}")
     print(f"- users: {len(users)}")
     print(f"- languages: {len(languages)}")
     print(f"- collections: {len(collections)}")
@@ -580,7 +636,20 @@ def main():
     query_directors = """
     UNWIND $rows AS row
     MERGE (d:Director {director_id: row.director_id})
-    SET d.name = row.name
+    SET d.name = row.name,
+        d.nationality = row.nationality,
+        d.birth_date = CASE WHEN row.birth_date IS NULL THEN null ELSE date(row.birth_date) END,
+        d.active = row.active,
+        d.style_tags = row.style_tags
+    """
+
+    query_genres = """
+    UNWIND $rows AS row
+    MERGE (g:Genre {name: row.name})
+    SET g.description = row.description,
+        g.popularity_index = row.popularity_index,
+        g.active = row.active,
+        g.created_at = CASE WHEN row.created_at IS NULL THEN date() ELSE date(row.created_at) END
     """
 
     query_languages = """
@@ -607,7 +676,8 @@ def main():
     MATCH (m:Movie {movie_id: row.movie_id})
     MERGE (d)-[r:DIRECTED]->(m)
     SET r.source = 'movies_clean',
-        r.last_updated = date()
+        r.last_updated = date(),
+        r.role = 'director'
     """
 
     query_genre_rel = """
@@ -617,7 +687,8 @@ def main():
     MATCH (m:Movie {movie_id: row.movie_id})
     MERGE (m)-[r:HAS_GENRE]->(g)
     SET r.source = 'movies_clean',
-        r.last_updated = date()
+        r.last_updated = date(),
+        r.relevance = 1.0
     """
 
     query_language_rel = """
@@ -626,7 +697,8 @@ def main():
     MATCH (l:Language {code: row.code})
     MERGE (m)-[r:IN_LANGUAGE]->(l)
     SET r.source = 'movies_clean',
-        r.last_updated = date()
+        r.last_updated = date(),
+        r.is_original = true
     """
 
     query_collection_rel = """
@@ -635,7 +707,8 @@ def main():
     MATCH (m:Movie {movie_id: row.movie_id})
     MERGE (c)-[r:CONTAINS]->(m)
     SET r.source = COALESCE(row.source, 'genre_grouping'),
-        r.last_updated = date()
+        r.last_updated = date(),
+        r.position = COALESCE(row.position, 0)
     """
 
     query_watchlisted = """
@@ -724,6 +797,7 @@ def main():
         print("Loading nodes...")
         run_batched_write(session, query_movies, movies, args.batch_size, "movies")
         run_batched_write(session, query_users, users, args.batch_size, "users")
+        run_batched_write(session, query_genres, genres, args.batch_size, "genres")
         run_batched_write(session, query_directors, directors, args.batch_size, "directors")
         run_batched_write(session, query_languages, languages, args.batch_size, "languages")
         run_batched_write(session, query_collections, collections, args.batch_size, "collections")
