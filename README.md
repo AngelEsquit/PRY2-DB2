@@ -1,112 +1,138 @@
 # PRY2-DB2 - Neo4j Recommender Backend
 
-Proyecto de Bases de Datos 2 orientado a un motor de recomendacion con Neo4j AuraDB.
+Proyecto de Bases de Datos 2: backend con FastAPI y Neo4j, y frontend Vite+React.
 
-## Estructura del repositorio
+## Estructura relevante
 
-- `app/`: API FastAPI con CRUD para nodos y relaciones.
-- `data/`: datasets originales y limpios.
-- `scripts/`: generacion, limpieza, carga y validacion de datos.
-- `docs/latex/`: documento final en LaTeX y PDF.
-- `docs/course/Instrucciones.md`: enunciado del proyecto.
+- `app/`: API FastAPI (endpoints CRUD, recomendaciones, etc.).
+- `data/clean/`: CSV limpios usados para carga.
+- `scripts/`: scripts para preprocesado, generación, carga y validación.
+- `frontend/`: aplicación Vite + React (UI mínima).
 
 ## Requisitos
 
-- Python 3.13+
-- Entorno virtual (`.venv`)
-- Neo4j AuraDB activo
-- MiKTeX (opcional, para compilar el documento)
+- Python 3.10+ (3.13 recomendado)
+- Node.js + npm
+- Neo4j (local o AuraDB)
 
-## Instalacion
+## Variables de entorno
 
-```powershell
-& "c:/Users/aeeh2/Documents/Universidad/Semestre 7/BasesdeDatos2/PRY2-DB2/.venv/Scripts/python.exe" -m pip install -r requirements.txt
-```
+Colocar un archivo `.env` en la raíz con como mínimo:
 
+- `NEO4J_URI` (ej: bolt://localhost:7687 o neo4j+s://...)
+- `NEO4J_USERNAME`
+- `NEO4J_PASSWORD`
+- `NEO4J_DATABASE` (opcional, por defecto `neo4j`)
+- `CORS_ALLOWED_ORIGINS` (opcional, comas separadas; por defecto se permiten orígenes locales de dev)
+- `VITE_API_URL` (opcional para el frontend)
 
-## Pipeline de datos
+Ejemplo mínimo `.env`:
 
-### 1) Generar usuarios e interacciones sinteticas
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=changeme
 
-```powershell
-& "c:/Users/aeeh2/Documents/Universidad/Semestre 7/BasesdeDatos2/PRY2-DB2/.venv/Scripts/python.exe" "scripts/generate_synthetic_users_interactions.py" --movies data/movies.csv --outdir data --users 2200 --seed 42
-```
+## Quick start (local)
 
-### 2) Limpiar datos
+1. Crear y activar entorno Python
 
-```powershell
-& "c:/Users/aeeh2/Documents/Universidad/Semestre 7/BasesdeDatos2/PRY2-DB2/.venv/Scripts/python.exe" "scripts/preprocess_data.py"
-```
+	 - Windows PowerShell:
+		 ```powershell
+		 python -m venv .venv
+		 .\.venv\Scripts\Activate.ps1
+		 pip install -r requirements.txt
+		 ```
 
-### 3) Cargar en Neo4j AuraDB
+	 - macOS / Linux:
+		 ```bash
+		 python -m venv .venv
+		 source .venv/bin/activate
+		 pip install -r requirements.txt
+		 ```
 
-Este paso crea y relaciona los labels principales del modelo, incluyendo `Language` y `Collection`.
+2. Levantar backend (FastAPI + Uvicorn)
 
-```powershell
-& "c:/Users/aeeh2/Documents/Universidad/Semestre 7/BasesdeDatos2/PRY2-DB2/.venv/Scripts/python.exe" "scripts/load_clean_data_to_neo4j.py"
-```
+	 ```bash
+	 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	 ```
 
-### 4) Validar post carga
+	 - Documentación Swagger: http://127.0.0.1:8000/docs
+	 - Health: `GET /health`
 
-```powershell
-& "c:/Users/aeeh2/Documents/Universidad/Semestre 7/BasesdeDatos2/PRY2-DB2/.venv/Scripts/python.exe" "scripts/validate_post_load.py"
-```
+3. Cargar datos (modo verificación / dry-run)
 
-Si hay peliculas huerfanas (sin genero/director), ejecutar correccion y revalidar:
+	 ```bash
+	 python scripts/load_clean_data_to_neo4j.py --data-dir data/clean --dry-run
+	 ```
 
-```powershell
-& "c:/Users/aeeh2/Documents/Universidad/Semestre 7/BasesdeDatos2/PRY2-DB2/.venv/Scripts/python.exe" "scripts/fix_post_load_orphans.py"
-& "c:/Users/aeeh2/Documents/Universidad/Semestre 7/BasesdeDatos2/PRY2-DB2/.venv/Scripts/python.exe" "scripts/validate_post_load.py"
-```
+	 - El `--dry-run` imprime los conteos preparados y los controles básicos sin escribir en la BD.
+	 - Para realizar la carga real, ejecutar sin `--dry-run`.
 
-## API CRUD (rubrica)
+4. Validar post-carga
 
-### Levantar API
+	 ```bash
+	 python scripts/validate_post_load.py
+	 ```
 
-```powershell
-& "c:/Users/aeeh2/Documents/Universidad/Semestre 7/BasesdeDatos2/PRY2-DB2/.venv/Scripts/python.exe" -m uvicorn app.main:app --reload
-```
+	 - Genera `validation_post_load_report.md` y devuelve `PASS`/`FAIL` según la rúbrica técnica.
 
-- Swagger: http://127.0.0.1:8000/docs
-- Health: `GET /health`
+5. Levantar frontend
 
-### Endpoints principales
+	 ```bash
+	 cd frontend
+	 npm install
+	 # Exportar VITE_API_URL si no está en .env del frontend
+	 npm run dev
+	 ```
 
-Nodos:
+## Checklist demostrable (mapa desde la rúbrica a comandos / evidencia)
 
-- `POST /nodes`
-- `GET /nodes/{label}/{id_property}/{id_value}`
-- `POST /nodes/search`
-- `POST /nodes/aggregate`
-- `PATCH /nodes/properties/add-one`
-- `PATCH /nodes/properties/add-many`
-- `PATCH /nodes/properties/update-one`
-- `PATCH /nodes/properties/update-many`
-- `DELETE /nodes/properties/delete-one`
-- `DELETE /nodes/properties/delete-many`
-- `DELETE /nodes/delete-one`
-- `DELETE /nodes/delete-many`
+- **Entorno reproducible:**
+	- Evidencia: ejecutar `python -m uvicorn app.main:app --reload` y `npm run dev` funciona.
 
-Relaciones:
+- **Carga de datos y volumen (>=5000 nodos):**
+	- Cómo demostrar: `python scripts/load_clean_data_to_neo4j.py --data-dir data/clean --dry-run` muestra conteos; `python scripts/validate_post_load.py` confirma `Total de nodos >= 5000` y escribe `validation_post_load_report.md`.
 
-- `POST /relationships`
-- `PATCH /relationships/properties/add-one`
-- `PATCH /relationships/properties/add-many`
-- `PATCH /relationships/properties/update-one`
-- `PATCH /relationships/properties/update-many`
-- `DELETE /relationships/properties/delete-one`
-- `DELETE /relationships/properties/delete-many`
-- `DELETE /relationships/delete-one`
-- `DELETE /relationships/delete-many`
+- **Nodos y labels (múltiples labels):**
+	- Cómo demostrar: `MATCH (n) RETURN distinct labels(n)` en Neo4j Browser o ejecutar `python scripts/validate_post_load.py` y revisar conteo por label en el reporte.
 
-## Documento del proyecto
+- **Relaciones y tipos (varios tipos):**
+	- Cómo demostrar: `python scripts/validate_post_load.py` imprime conteos por tipo de relación (DIRECTED, HAS_GENRE, VIEWED, RATED, PREFERS, FRIEND_OF, etc.).
 
-- Fuente LaTeX: `docs/latex/documento_proyecto.tex`
-- PDF: `docs/latex/documento_proyecto.pdf`
+- **Propiedades y tipos heterogéneos:**
+	- Cómo demostrar: usar `POST /nodes/search` o ejecutar consultas Cypher (ej: `MATCH (m:Movie) RETURN m.title, m.release_date, m.popularity LIMIT 5`) para mostrar fechas, números, listas y booleanos.
 
-Compilar PDF:
+- **CRUD funcional vía API:**
+	- Cómo demostrar:
+		- Crear nodo: `curl -X POST http://localhost:8000/nodes -H 'Content-Type: application/json' -d '{"label":"Test","props":{"test_id":1,"name":"x"}}'`
+		- Leer: `GET /nodes/Test/test_id/1`
+		- Actualizar propiedades: `PATCH /nodes/properties/update-one`
+		- Borrar: `DELETE /nodes/delete-one`
 
-```powershell
-Set-Location "c:/Users/aeeh2/Documents/Universidad/Semestre 7/BasesdeDatos2/PRY2-DB2/docs/latex"
-& "c:/Users/aeeh2/AppData/Local/Programs/MiKTeX/miktex/bin/x64/pdflatex.exe" -interaction=nonstopmode -halt-on-error "documento_proyecto.tex"
-```
+- **Agregaciones y búsqueda:**
+	- Cómo demostrar: `POST /nodes/aggregate` con payload de agregación; `POST /nodes/search` para búsquedas por propiedad/regex.
+
+- **Algoritmo de recomendación:**
+	- Cómo demostrar: `GET /recommendations/{user_id}` (ej: `curl http://localhost:8000/recommendations/1`) y mostrar JSON de recomendaciones.
+
+- **Integridad post-carga:**
+	- Cómo demostrar: `python scripts/validate_post_load.py` — revisa películas sin género/director, usuarios sin interacciones, nodos aislados, colecciones sin creador o películas. El script falla (exit code != 0) si hay problemas.
+
+- **Conectividad del grafo (seed reachable):**
+	- Cómo demostrar: revisar la sección `## Conectividad` en `validation_post_load_report.md` generada por `validate_post_load.py`.
+
+## Donde mirar / archivos útiles
+
+- Carga y generación de datos: `scripts/load_clean_data_to_neo4j.py`
+- Validación post-carga: `scripts/validate_post_load.py` (genera `validation_post_load_report.md`)
+- API principal: `app/main.py`
+- Frontend API client: `frontend/src/services/api.js` (usa `VITE_API_URL`)
+
+---
+
+Si quieres, puedo:
+
+- Ejecutar `--dry-run` aquí y pegar los conteos.
+- Ejecutar la carga real (necesita credenciales Neo4j activas en `.env`).
+- Empezar un pequeño script que ejecute todas las comprobaciones y genere un informe listo para la exposición.
+
