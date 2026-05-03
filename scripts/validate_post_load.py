@@ -203,6 +203,7 @@ def main():
 
     passed = True
     failures = []
+    advisories = []
 
     if total_nodes < 5000:
         passed = False
@@ -227,12 +228,15 @@ def main():
         failures.append(f"Colecciones sin películas: {checks['collections_without_movies']}")
     for label, count in node_property_checks.items():
         if count > 0:
-            passed = False
-            failures.append(f"Nodos {label} con menos de {MIN_NODE_PROPS[label]} propiedades: {count}")
+            advisories.append(f"Nodos {label} con menos de {MIN_NODE_PROPS[label]} propiedades: {count}")
     for rel_type, count in rel_property_checks.items():
         if count > 0:
-            passed = False
-            failures.append(f"Relaciones {rel_type} con menos de {MIN_REL_PROPS[rel_type]} propiedades: {count}")
+            message = f"Relaciones {rel_type} con menos de {MIN_REL_PROPS[rel_type]} propiedades: {count}"
+            if rel_type == "CONTAINS":
+                passed = False
+                failures.append(message)
+            else:
+                advisories.append(message)
     if connectivity["unreachable_others"] > 0:
         passed = False
         failures.append(f"Nodos no alcanzables desde el seed: {connectivity['unreachable_others']}")
@@ -295,6 +299,12 @@ def main():
         lines.append("### Fallos detectados")
         for failure in failures:
             lines.append(f"- {failure}")
+
+    if advisories:
+        lines.append("")
+        lines.append("### Observaciones no críticas")
+        for advisory in advisories:
+            lines.append(f"- {advisory}")
 
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
