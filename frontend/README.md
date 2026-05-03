@@ -1,6 +1,6 @@
 # CineGraph Frontend
 
-Frontend elegante para el proyecto PRY2-DB2. Está hecho con React + Vite y se conecta al backend FastAPI con Neo4j.
+Frontend para el proyecto PRY2-DB2. Está hecho con React + Vite y se conecta al backend FastAPI con Neo4j.
 
 ## Requisitos
 
