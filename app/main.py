@@ -1,7 +1,7 @@
 import os
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any, Dict, List, Literal, Optional
 
 from dotenv import load_dotenv
@@ -1115,7 +1115,23 @@ def get_movie(movie_id: str):
     if not row:
         raise HTTPException(status_code=404, detail=f"Movie '{movie_id}' not found")
 
-    return dict(row)
+    result = dict(row)
+    # Convertir release_date a ISO string si es un objeto date o similar
+    release_date = result.get("release_date")
+    if release_date:
+        if isinstance(release_date, date):
+            result["release_date"] = release_date.isoformat()
+        elif hasattr(release_date, 'isoformat'):
+            # Para objetos Neo4j que tengan isoformat
+            result["release_date"] = release_date.isoformat()
+        elif isinstance(release_date, dict) and '_Date__year' in release_date:
+            # Para fechas serializadas de Neo4j
+            year = release_date.get('_Date__year')
+            month = release_date.get('_Date__month')
+            day = release_date.get('_Date__day')
+            if year and month and day:
+                result["release_date"] = f"{year:04d}-{month:02d}-{day:02d}"
+    return result
 
 
 @app.get("/movies/{movie_id}/similar", tags=["similarity"])
