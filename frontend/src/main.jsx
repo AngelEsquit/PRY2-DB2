@@ -13,7 +13,7 @@ import {
   Users,
   WifiOff,
 } from 'lucide-react';
-import { api } from './services/api';
+import { API_URL, api } from './services/api';
 import './styles.css';
 
 function metric(value, fallback = '-') {
@@ -335,7 +335,6 @@ function NodePropertyManager() {
   );
 }
 function AdminUpload() {
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   const [files, setFiles] = useState(null);
   const [dataDir, setDataDir] = useState('');
   const [log, setLog] = useState('');
@@ -344,7 +343,7 @@ function AdminUpload() {
     const msg = isDemo ? 'Preparando datos de demostración...' : 'Preparando carga automática...';
     setLog(msg);
     try {
-      const url = new URL(`${API_URL}/prepare-loader`);
+      const url = new URL(`${API_URL}/prepare-loader`, window.location.origin);
       if (isDemo) url.searchParams.append('use_demo', 'true');
       const res = await fetch(url, { method: 'POST' });
       const data = await res.json();
