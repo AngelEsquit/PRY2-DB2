@@ -60,6 +60,110 @@ function userName(user) {
   return user.name || user.properties?.name || userId(user);
 }
 
+const adminSectionStyle = {
+  marginTop: '18px',
+  padding: '22px',
+  borderRadius: '20px',
+  border: '1px solid rgba(233, 237, 245, 0.09)',
+  background: 'linear-gradient(180deg, rgba(22, 28, 39, 0.92), rgba(18, 24, 33, 0.82))',
+  boxShadow: '0 24px 80px rgba(0, 0, 0, 0.22)',
+};
+
+const adminHeroStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'flex-end',
+  justifyContent: 'space-between',
+  gap: '14px',
+  marginBottom: '18px',
+  paddingBottom: '16px',
+  borderBottom: '1px solid rgba(233, 237, 245, 0.08)',
+};
+
+const adminEyebrowStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '8px',
+  padding: '6px 10px',
+  borderRadius: '999px',
+  background: 'rgba(111, 182, 255, 0.12)',
+  color: '#6fb6ff',
+  fontSize: '12px',
+  fontWeight: '700',
+  letterSpacing: '0.02em',
+  textTransform: 'uppercase',
+};
+
+const adminTitleStyle = {
+  marginTop: '10px',
+  fontSize: '28px',
+  lineHeight: 1.05,
+};
+
+const adminSubtitleStyle = {
+  marginTop: '10px',
+  maxWidth: '720px',
+  color: '#9aa7bd',
+  lineHeight: 1.6,
+};
+
+const adminGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+  gap: '16px',
+};
+
+const adminCardStyle = {
+  padding: '18px',
+  borderRadius: '18px',
+  border: '1px solid rgba(233, 237, 245, 0.08)',
+  background: 'rgba(233, 237, 245, 0.03)',
+  display: 'grid',
+  gap: '12px',
+  minHeight: '100%',
+};
+
+const adminChipStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  minHeight: '28px',
+  padding: '0 10px',
+  borderRadius: '999px',
+  background: 'rgba(233, 237, 245, 0.06)',
+  color: '#c2cada',
+  fontSize: '12px',
+  border: '1px solid rgba(233, 237, 245, 0.08)',
+};
+
+const adminResultPanelStyle = {
+  marginTop: '16px',
+  padding: '16px',
+  borderRadius: '16px',
+  background: 'rgba(13, 17, 23, 0.68)',
+  border: '1px solid rgba(233, 237, 245, 0.08)',
+  display: 'grid',
+  gap: '10px',
+};
+
+const adminResultMetaStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '8px',
+  alignItems: 'center',
+};
+
+const adminResultBadgeStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  minHeight: '28px',
+  padding: '0 10px',
+  borderRadius: '999px',
+  background: 'rgba(229, 166, 84, 0.12)',
+  color: '#e5a654',
+  fontSize: '12px',
+  fontWeight: '700',
+};
+
 function Header({ active, setActive, status, currentUser, onLogout }) {
   const tabs = [
     ['discover', 'Descubrir', Film],
@@ -223,12 +327,23 @@ function NodePropertyManager() {
   });
 
   return (
-    <section className="panel" style={{marginTop: '18px'}}>
-      <h2>Gestión de propiedades en nodos</h2>
-      <p>Define un nodo por label e identificador, o filtra varios nodos al mismo tiempo. Las propiedades y filtros se escriben en JSON.</p>
+    <section className="panel" style={adminSectionStyle}>
+      <div style={adminHeroStyle}>
+        <div>
+          <span style={adminEyebrowStyle}>Gestión de propiedades</span>
+          <h2 style={adminTitleStyle}>Administra propiedades en nodos desde una sola vista</h2>
+          <p style={adminSubtitleStyle}>Define un nodo por label e identificador, o filtra varios nodos al mismo tiempo. Las propiedades y filtros se escriben en JSON.</p>
+        </div>
+        <div style={{display: 'grid', gap: '8px', minWidth: '240px'}}>
+          <span style={adminChipStyle}>Nodo individual</span>
+          <span style={adminChipStyle}>Múltiples nodos</span>
+          <span style={adminChipStyle}>JSON flexible</span>
+        </div>
+      </div>
+      <p style={{fontSize: '12px', color: '#9aa7bd', marginTop: '6px'}}>Para <span style={{fontFamily: 'monospace'}}>Movie</span>, el filtro <span style={{fontFamily: 'monospace'}}>"genre"</span> usa la relación <span style={{fontFamily: 'monospace'}}>HAS_GENRE</span>. Ejemplo: <span style={{fontFamily: 'monospace'}}>{'{"genre":"Drama"}'}</span>.</p>
 
-      <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', marginTop: '18px'}}>
-        <div style={cardStyle}>
+      <div style={{...adminGridStyle, marginTop: '18px'}}>
+        <div style={{...adminCardStyle, gridColumn: 'span 6'}}>
           <h3>Nodo individual</h3>
           <input
             value={selectorLabel}
@@ -261,9 +376,6 @@ function NodePropertyManager() {
             style={textAreaStyle}
           />
           <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px'}}>
-            <button type="button" onClick={() => runAction('add-one')} disabled={!!busy} style={actionButtonStyle({border: '1px solid rgba(111, 182, 255, 0.22)', background: 'rgba(111, 182, 255, 0.1)', color: '#6fb6ff'})}>
-              Agregar propiedades
-            </button>
             <button type="button" onClick={() => runAction('update-one')} disabled={!!busy} style={actionButtonStyle({border: '1px solid rgba(229, 166, 84, 0.22)', background: 'rgba(229, 166, 84, 0.1)', color: '#e5a654'})}>
               Actualizar propiedades
             </button>
@@ -273,7 +385,7 @@ function NodePropertyManager() {
           </div>
         </div>
 
-        <div style={cardStyle}>
+        <div style={{...adminCardStyle, gridColumn: 'span 6'}}>
           <h3>Múltiples nodos</h3>
           <input
             value={manyLabel}
@@ -285,7 +397,6 @@ function NodePropertyManager() {
             value={manyFiltersText}
             onChange={(event) => setManyFiltersText(event.target.value)}
             placeholder='{"campo": "valor"}'
-            style={textAreaStyle}
           />
           <textarea
             value={manyPropertiesText}
@@ -300,9 +411,6 @@ function NodePropertyManager() {
             style={textAreaStyle}
           />
           <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px'}}>
-            <button type="button" onClick={() => runAction('add-many')} disabled={!!busy} style={actionButtonStyle({border: '1px solid rgba(111, 182, 255, 0.22)', background: 'rgba(111, 182, 255, 0.1)', color: '#6fb6ff'})}>
-              Agregar propiedades
-            </button>
             <button type="button" onClick={() => runAction('update-many')} disabled={!!busy} style={actionButtonStyle({border: '1px solid rgba(229, 166, 84, 0.22)', background: 'rgba(229, 166, 84, 0.1)', color: '#e5a654'})}>
               Actualizar propiedades
             </button>
@@ -313,12 +421,16 @@ function NodePropertyManager() {
         </div>
       </div>
 
-      <div style={{marginTop: '16px', display: 'grid', gap: '10px'}}>
+      <div style={adminResultPanelStyle}>
+        <div style={adminResultMetaStyle}>
+          <span style={adminResultBadgeStyle}>Respuesta backend</span>
+          <span style={{color: '#9aa7bd', fontSize: '12px'}}>Aquí aparece el payload devuelto por Neo4j para cada acción.</span>
+        </div>
         <p style={{fontSize: '12px', color: '#9aa7bd'}}>Consejo: para el valor del identificador puedes escribir texto plano, un número o JSON válido. Ejemplo: <span style={{fontFamily: 'monospace'}}>123</span> o <span style={{fontFamily: 'monospace'}}>"M001"</span>.</p>
         <pre style={{
           margin: 0,
           padding: '14px',
-          borderRadius: '10px',
+          borderRadius: '12px',
           background: 'rgba(13, 17, 23, 0.6)',
           border: '1px solid rgba(233, 237, 245, 0.08)',
           fontSize: '12px',
@@ -330,6 +442,192 @@ function NodePropertyManager() {
           {result || 'Aquí aparecerá la respuesta del backend.'}
         </pre>
         <p style={{fontSize: '12px', color: status.includes('completada') ? '#42d392' : '#9aa7bd', margin: 0}}>{status || 'Listo para ejecutar operaciones.'}</p>
+      </div>
+    </section>
+  );
+}
+
+function NodeDeletionManager() {
+  const [selectorLabel, setSelectorLabel] = useState('Movie');
+  const [selectorIdProperty, setSelectorIdProperty] = useState('movie_id');
+  const [selectorIdValue, setSelectorIdValue] = useState('');
+  const [manyLabel, setManyLabel] = useState('Movie');
+  const [manyFiltersText, setManyFiltersText] = useState(() => ['{', '  "status": "Released"', '}'].join('\n'));
+  const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState('');
+  const [result, setResult] = useState('');
+
+  const parseJsonInput = (text, fallback) => {
+    const trimmed = text.trim();
+    if (!trimmed) return fallback;
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      throw new Error('JSON inválido');
+    }
+  };
+
+  const parseValueInput = (text) => {
+    const trimmed = text.trim();
+    if (!trimmed) return '';
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return text;
+    }
+  };
+
+  const runAction = async (action) => {
+    setBusy(action);
+    setStatus('Ejecutando eliminación...');
+    try {
+      let response = null;
+      if (action === 'delete-one') {
+        response = await api.deleteNodeOne({
+          selector: {
+            label: selectorLabel.trim(),
+            id_property: selectorIdProperty.trim(),
+            id_value: parseValueInput(selectorIdValue),
+          },
+          detach: true,
+        });
+      } else if (action === 'delete-many') {
+        response = await api.deleteNodeMany({
+          label: manyLabel.trim(),
+          filters: parseJsonInput(manyFiltersText, {}),
+          detach: true,
+        });
+      }
+      setResult(JSON.stringify(response, null, 2));
+      setStatus('Eliminación completada');
+    } catch (err) {
+      setStatus(err.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const cardStyle = {
+    padding: '16px',
+    borderRadius: '12px',
+    border: '1px solid rgba(233, 237, 245, 0.08)',
+    background: 'rgba(233, 237, 245, 0.03)',
+    display: 'grid',
+    gap: '12px',
+  };
+
+  const fieldStyle = {
+    width: '100%',
+    minHeight: '38px',
+    padding: '10px 12px',
+    borderRadius: '10px',
+    border: '1px solid rgba(233, 237, 245, 0.12)',
+    background: 'rgba(13, 17, 23, 0.8)',
+    color: '#e9edf5',
+  };
+
+  const textAreaStyle = {
+    ...fieldStyle,
+    minHeight: '92px',
+    resize: 'vertical',
+    fontFamily: 'monospace',
+    fontSize: '12px',
+  };
+
+  const actionButtonStyle = (tone) => ({
+    minHeight: '38px',
+    padding: '0 12px',
+    borderRadius: '10px',
+    cursor: busy ? 'not-allowed' : 'pointer',
+    opacity: busy ? 0.65 : 1,
+    border: tone.border,
+    background: tone.background,
+    color: tone.color,
+    fontWeight: '600',
+  });
+
+  return (
+    <section className="panel" style={adminSectionStyle}>
+      <div style={adminHeroStyle}>
+        <div>
+          <span style={adminEyebrowStyle}>Eliminación de nodos</span>
+          <h2 style={adminTitleStyle}>Borra uno o varios nodos desde un mismo panel</h2>
+          <p style={adminSubtitleStyle}>La eliminación usa <span style={{fontFamily: 'monospace'}}>DETACH DELETE</span> para quitar también las relaciones conectadas y mantener el grafo consistente.</p>
+        </div>
+        <div style={{display: 'grid', gap: '8px', minWidth: '240px'}}>
+          <span style={adminChipStyle}>1 nodo</span>
+          <span style={adminChipStyle}>Múltiples nodos</span>
+          <span style={adminChipStyle}>DETACH DELETE</span>
+        </div>
+      </div>
+
+      <div style={adminGridStyle}>
+        <div style={{...adminCardStyle, gridColumn: 'span 6'}}>
+          <h3>Nodo individual</h3>
+          <input
+            value={selectorLabel}
+            onChange={(event) => setSelectorLabel(event.target.value)}
+            placeholder="Label"
+            style={fieldStyle}
+          />
+          <input
+            value={selectorIdProperty}
+            onChange={(event) => setSelectorIdProperty(event.target.value)}
+            placeholder="Propiedad identificadora"
+            style={fieldStyle}
+          />
+          <input
+            value={selectorIdValue}
+            onChange={(event) => setSelectorIdValue(event.target.value)}
+            placeholder="Valor del identificador"
+            style={fieldStyle}
+          />
+          <button type="button" onClick={() => runAction('delete-one')} disabled={!!busy} style={actionButtonStyle({border: '1px solid rgba(255, 143, 143, 0.22)', background: 'rgba(255, 143, 143, 0.1)', color: '#ff8f8f'})}>
+            Eliminar nodo
+          </button>
+        </div>
+
+        <div style={{...adminCardStyle, gridColumn: 'span 6'}}>
+          <h3>Múltiples nodos</h3>
+          <input
+            value={manyLabel}
+            onChange={(event) => setManyLabel(event.target.value)}
+            placeholder="Label"
+            style={fieldStyle}
+          />
+          <textarea
+            value={manyFiltersText}
+            onChange={(event) => setManyFiltersText(event.target.value)}
+            placeholder='{"status": "Released"}'
+            style={textAreaStyle}
+          />
+          <button type="button" onClick={() => runAction('delete-many')} disabled={!!busy} style={actionButtonStyle({border: '1px solid rgba(255, 143, 143, 0.22)', background: 'rgba(255, 143, 143, 0.1)', color: '#ff8f8f'})}>
+            Eliminar nodos
+          </button>
+        </div>
+      </div>
+
+      <div style={adminResultPanelStyle}>
+        <div style={adminResultMetaStyle}>
+          <span style={adminResultBadgeStyle}>Respuesta backend</span>
+          <span style={{color: '#9aa7bd', fontSize: '12px'}}>Aquí aparece el payload devuelto por Neo4j para cada acción.</span>
+        </div>
+        <p style={{fontSize: '12px', color: '#9aa7bd'}}>Consejo: al borrar un nodo se eliminan también sus relaciones conectadas.</p>
+        <pre style={{
+          margin: 0,
+          padding: '14px',
+          borderRadius: '12px',
+          background: 'rgba(13, 17, 23, 0.6)',
+          border: '1px solid rgba(233, 237, 245, 0.08)',
+          fontSize: '12px',
+          color: '#9aa7bd',
+          overflow: 'auto',
+          minHeight: '120px',
+          whiteSpace: 'pre-wrap',
+        }}>
+          {result || 'Aquí aparecerá la respuesta del backend.'}
+        </pre>
+        <p style={{fontSize: '12px', color: status.includes('completada') ? '#42d392' : '#9aa7bd', margin: 0}}>{status || 'Listo para eliminar nodos.'}</p>
       </div>
     </section>
   );
@@ -480,42 +778,197 @@ function RelationshipManager() {
     cursor: 'pointer',
   };
 
+  const sectionStyle = {
+    marginTop: '18px',
+    padding: '22px',
+    borderRadius: '20px',
+    border: '1px solid rgba(233, 237, 245, 0.09)',
+    background: 'linear-gradient(180deg, rgba(22, 28, 39, 0.92), rgba(18, 24, 33, 0.82))',
+    boxShadow: '0 24px 80px rgba(0, 0, 0, 0.22)',
+  };
+
+  const heroStyle = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: '14px',
+    marginBottom: '18px',
+    paddingBottom: '16px',
+    borderBottom: '1px solid rgba(233, 237, 245, 0.08)',
+  };
+
+  const eyebrowStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '6px 10px',
+    borderRadius: '999px',
+    background: 'rgba(111, 182, 255, 0.12)',
+    color: '#6fb6ff',
+    fontSize: '12px',
+    fontWeight: '700',
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
+  };
+
+  const titleStyle = {
+    marginTop: '10px',
+    fontSize: '28px',
+    lineHeight: 1.05,
+  };
+
+  const subtitleStyle = {
+    marginTop: '10px',
+    maxWidth: '720px',
+    color: '#9aa7bd',
+    lineHeight: 1.6,
+  };
+
+  const gridStyle = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+    gap: '16px',
+  };
+
+  const cardStyle = {
+    padding: '18px',
+    borderRadius: '18px',
+    border: '1px solid rgba(233, 237, 245, 0.08)',
+    background: 'rgba(233, 237, 245, 0.03)',
+    display: 'grid',
+    gap: '12px',
+    minHeight: '100%',
+  };
+
+  const labelStyle = {
+    display: 'block',
+    marginBottom: '8px',
+    color: '#c2cada',
+    fontSize: '12px',
+    fontWeight: '700',
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
+  };
+
+  const helperStyle = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+  };
+
+  const chipStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    minHeight: '28px',
+    padding: '0 10px',
+    borderRadius: '999px',
+    background: 'rgba(233, 237, 245, 0.06)',
+    color: '#c2cada',
+    fontSize: '12px',
+    border: '1px solid rgba(233, 237, 245, 0.08)',
+  };
+
+  const resultPanelStyle = {
+    marginTop: '16px',
+    padding: '16px',
+    borderRadius: '16px',
+    background: 'rgba(13, 17, 23, 0.68)',
+    border: '1px solid rgba(233, 237, 245, 0.08)',
+    display: 'grid',
+    gap: '10px',
+  };
+
+  const resultMetaStyle = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    alignItems: 'center',
+  };
+
+  const resultBadgeStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    minHeight: '28px',
+    padding: '0 10px',
+    borderRadius: '999px',
+    background: 'rgba(229, 166, 84, 0.12)',
+    color: '#e5a654',
+    fontSize: '12px',
+    fontWeight: '700',
+  };
+
   return (
-    <section className="panel" style={{marginTop: '18px'}}>
-      <h2>Gestion de relaciones</h2>
-      <p>Crea relaciones y administra propiedades en una o varias relaciones.</p>
-      <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '14px'}}>
+    <section className="panel" style={sectionStyle}>
+      <div style={heroStyle}>
         <div>
-          <h3>Crear relacion</h3>
-          <textarea value={createText} onChange={(event) => setCreateText(event.target.value)} style={textStyle} />
-          <button type="button" onClick={() => run('create')} style={buttonStyle}>Crear relacion</button>
+          <span style={eyebrowStyle}>Gestión de relaciones</span>
+          <h2 style={titleStyle}>Crea, ajusta y elimina relaciones desde una sola vista</h2>
+          <p style={subtitleStyle}>Usa esta sección para probar la creación de vínculos y la administración de propiedades en relaciones individuales o masivas, con una salida clara del backend al final.</p>
         </div>
-        <div>
-          <h3>Relacion individual</h3>
-          <textarea value={oneText} onChange={(event) => setOneText(event.target.value)} style={textStyle} />
-          <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px'}}>
+        <div style={{display: 'grid', gap: '8px', minWidth: '240px'}}>
+          <span style={chipStyle}>Crear relación</span>
+          <span style={chipStyle}>Editar propiedades</span>
+          <span style={chipStyle}>Eliminar relación</span>
+        </div>
+      </div>
+
+      <div style={gridStyle}>
+        <div style={{...cardStyle, gridColumn: 'span 4'}}>
+          <div>
+            <h3 style={{marginBottom: '6px'}}>Crear relación</h3>
+            <p style={{color: '#9aa7bd', fontSize: '12px', lineHeight: 1.5}}>Define el enlace base entre dos nodos y agrega propiedades iniciales.</p>
+          </div>
+          <textarea value={createText} onChange={(event) => setCreateText(event.target.value)} style={{...textStyle, minHeight: '240px'}} />
+          <button type="button" onClick={() => run('create')} style={{...buttonStyle, background: 'linear-gradient(135deg, #e5a654, #f0c37d)', color: '#11151c', border: 'none', fontWeight: 800}}>
+            Crear relación
+          </button>
+        </div>
+
+        <div style={{...cardStyle, gridColumn: 'span 4'}}>
+          <div>
+            <h3 style={{marginBottom: '6px'}}>Relación individual</h3>
+            <p style={{color: '#9aa7bd', fontSize: '12px', lineHeight: 1.5}}>Trabaja sobre una relación concreta usando su selector completo.</p>
+          </div>
+          <textarea value={oneText} onChange={(event) => setOneText(event.target.value)} style={{...textStyle, minHeight: '240px'}} />
+          <div style={helperStyle}>
             <button type="button" onClick={() => run('add-one')} style={buttonStyle}>Agregar props</button>
             <button type="button" onClick={() => run('update-one')} style={buttonStyle}>Actualizar props</button>
             <button type="button" onClick={() => run('delete-one-props')} style={buttonStyle}>Eliminar props</button>
-            <button type="button" onClick={() => run('delete-one')} style={buttonStyle}>Eliminar relacion</button>
+            <button type="button" onClick={() => run('delete-one')} style={{...buttonStyle, borderColor: 'rgba(255, 143, 143, 0.2)', background: 'rgba(255, 143, 143, 0.08)', color: '#ff8f8f'}}>
+              Eliminar relación
+            </button>
           </div>
         </div>
-        <div>
-          <h3>Multiples relaciones</h3>
-          <textarea value={manyText} onChange={(event) => setManyText(event.target.value)} style={textStyle} />
-          <textarea value={deleteKeysText} onChange={(event) => setDeleteKeysText(event.target.value)} style={{...textStyle, minHeight: '48px', marginTop: '8px'}} />
-          <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px'}}>
+
+        <div style={{...cardStyle, gridColumn: 'span 4'}}>
+          <div>
+            <h3 style={{marginBottom: '6px'}}>Múltiples relaciones</h3>
+            <p style={{color: '#9aa7bd', fontSize: '12px', lineHeight: 1.5}}>Aplica cambios a todo el conjunto filtrado por nodos extremos y atributos de la relación.</p>
+          </div>
+          <textarea value={manyText} onChange={(event) => setManyText(event.target.value)} style={{...textStyle, minHeight: '180px'}} />
+          <textarea value={deleteKeysText} onChange={(event) => setDeleteKeysText(event.target.value)} style={{...textStyle, minHeight: '70px'}} />
+          <div style={helperStyle}>
             <button type="button" onClick={() => run('add-many')} style={buttonStyle}>Agregar props</button>
             <button type="button" onClick={() => run('update-many')} style={buttonStyle}>Actualizar props</button>
             <button type="button" onClick={() => run('delete-many-props')} style={buttonStyle}>Eliminar props</button>
-            <button type="button" onClick={() => run('delete-many')} style={buttonStyle}>Eliminar relaciones</button>
+            <button type="button" onClick={() => run('delete-many')} style={{...buttonStyle, borderColor: 'rgba(255, 143, 143, 0.2)', background: 'rgba(255, 143, 143, 0.08)', color: '#ff8f8f'}}>
+              Eliminar relaciones
+            </button>
           </div>
         </div>
       </div>
-      <pre style={{marginTop: '12px', padding: '14px', borderRadius: '10px', background: 'rgba(13, 17, 23, 0.6)', border: '1px solid rgba(233, 237, 245, 0.08)', fontSize: '12px', color: '#9aa7bd', overflow: 'auto', whiteSpace: 'pre-wrap'}}>
-        {result || 'Aqui aparecera la respuesta del backend.'}
-      </pre>
-      <p style={{fontSize: '12px', color: status.includes('completada') ? '#42d392' : '#9aa7bd', margin: 0}}>{status || 'Listo para operar relaciones.'}</p>
+
+      <div style={resultPanelStyle}>
+        <div style={resultMetaStyle}>
+          <span style={resultBadgeStyle}>Respuesta backend</span>
+          <span style={{color: '#9aa7bd', fontSize: '12px'}}>Aquí aparece el payload devuelto por Neo4j para cada acción.</span>
+        </div>
+        <pre style={{margin: 0, padding: '14px', borderRadius: '12px', background: 'rgba(13, 17, 23, 0.6)', border: '1px solid rgba(233, 237, 245, 0.08)', fontSize: '12px', color: '#9aa7bd', overflow: 'auto', whiteSpace: 'pre-wrap', minHeight: '120px'}}>
+          {result || 'Aqui aparecera la respuesta del backend.'}
+        </pre>
+        <p style={{fontSize: '12px', color: status.includes('completada') ? '#42d392' : '#9aa7bd', margin: 0}}>{status || 'Listo para operar relaciones.'}</p>
+      </div>
     </section>
   );
 }
@@ -733,6 +1186,7 @@ function AdminUpload() {
         Nota: Asegúrate de que el backend tenga las variables de entorno de Neo4j en `.env` para carga real.
       </p>
       <NodePropertyManager />
+      <NodeDeletionManager />
       <AggregateManager />
       <RelationshipManager />
     </section>

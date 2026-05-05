@@ -745,10 +745,13 @@ def add_node_properties_many(payload: NodePropertyManyRequest):
     params: Dict[str, Any] = {"props": props}
     where_parts = []
     for idx, (key, value) in enumerate(payload.filters.items()):
-        key = sanitize_identifier(key, "property name")
         p = f"f{idx}"
-        where_parts.append(f"n.{key} = ${p}")
         params[p] = value
+        if key == "genre":
+            where_parts.append(f"EXISTS {{ MATCH (n)-[:HAS_GENRE]->(g:Genre) WHERE g.name = ${p} }}")
+        else:
+            key = sanitize_identifier(key, "property name")
+            where_parts.append(f"n.{key} = ${p}")
     where_clause = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
     query = f"""
     MATCH (n:{label}) {where_clause}
@@ -790,10 +793,13 @@ def delete_node_properties_many(payload: NodePropertyDeleteManyRequest):
     params: Dict[str, Any] = {"keys": keys}
     where_parts = []
     for idx, (key, value) in enumerate(payload.filters.items()):
-        key = sanitize_identifier(key, "property name")
         p = f"f{idx}"
-        where_parts.append(f"n.{key} = ${p}")
         params[p] = value
+        if key == "genre":
+            where_parts.append(f"EXISTS {{ MATCH (n)-[:HAS_GENRE]->(g:Genre) WHERE g.name = ${p} }}")
+        else:
+            key = sanitize_identifier(key, "property name")
+            where_parts.append(f"n.{key} = ${p}")
     where_clause = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
     query = f"""
     MATCH (n:{label}) {where_clause}

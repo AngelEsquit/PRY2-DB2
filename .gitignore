@@ -28,3 +28,6 @@ Thumbs.db
 
 # Data
 data/clean/uploaded
+
+# Node modules
+frontend/node_modules
