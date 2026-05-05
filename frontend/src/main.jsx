@@ -50,6 +50,7 @@ function Header({ active, setActive, status, currentUser, onLogout }) {
     ['recommendations', 'Recomendaciones', Sparkles],
     ['library', 'Biblioteca', Bookmark],
     ['social', 'Social', Users],
+    ['admin', 'Admin', FolderPlus],
   ];
 
   return (
@@ -79,6 +80,216 @@ function Header({ active, setActive, status, currentUser, onLogout }) {
         </button>
       </div>
     </header>
+  );
+}
+
+function AdminUpload() {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  const [files, setFiles] = useState(null);
+  const [dataDir, setDataDir] = useState('');
+  const [log, setLog] = useState('');
+
+  const prepareLoader = async (isDemo = false) => {
+    const msg = isDemo ? 'Preparando datos de demostración...' : 'Preparando carga automática...';
+    setLog(msg);
+    try {
+      const url = new URL(`${API_URL}/prepare-loader`);
+      if (isDemo) url.searchParams.append('use_demo', 'true');
+      const res = await fetch(url, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error al preparar carga');
+      setDataDir(data.data_dir || '');
+      setLog('✓ Archivos copiados: ' + (data.copied || []).map((s) => s.split('/').pop()).join(', '));
+    } catch (err) {
+      setLog('✗ Error: ' + err.message);
+    }
+  };
+
+  const upload = async () => {
+    if (!files || files.length === 0) return;
+    const fd = new FormData();
+    for (let i = 0; i < files.length; i++) fd.append('files', files[i]);
+    setLog('Uploading...');
+    try {
+      const res = await fetch(`${API_URL}/upload-csv`, { method: 'POST', body: fd });
+      const data = await res.json();
+      setDataDir(data.data_dir || '');
+      setLog('Uploaded: ' + (data.saved || []).map((s) => s.split('/').pop()).join(', '));
+    } catch (err) {
+      setLog('Upload failed: ' + err.message);
+    }
+  };
+
+  const runLoader = async (dry = true) => {
+    if (!dataDir) return setLog('No data_dir to run loader against. Prepare or upload first.');
+    setLog(dry ? 'Running dry-run...' : 'Running real load...');
+    const fd = new FormData();
+    fd.append('data_dir', dataDir);
+    fd.append('dry_run', dry ? 'true' : 'false');
+    try {
+      const res = await fetch(`${API_URL}/run-loader`, { method: 'POST', body: fd });
+      const data = await res.json();
+      setLog('Loader finished. stdout:\n' + (data.stdout || '') + '\nstderr:\n' + (data.stderr || ''));
+    } catch (err) {
+      setLog('Loader failed: ' + err.message);
+    }
+  };
+
+  const clearDemoData = async () => {
+    if (!window.confirm('¿Eliminar datos de demo de Neo4j?')) return;
+    setLog('Limpiando datos de demo...');
+    try {
+      const res = await fetch(`${API_URL}/clear-loader-data?use_demo=true`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error al limpiar');
+      setLog('✓ ' + (data.message || 'Datos eliminados correctamente'));
+    } catch (err) {
+      setLog('✗ Error: ' + err.message);
+    }
+  };
+
+  return (
+    <section className="panel">
+      <h2>Administración - Carga de datos</h2>
+      <p>Prepara y carga datos a Neo4j directamente desde el frontend.</p>
+      
+      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '24px'}}>
+        <div style={{
+          padding: '16px',
+          borderRadius: '12px',
+          border: '1px solid rgba(111, 182, 255, 0.3)',
+          background: 'rgba(111, 182, 255, 0.05)'
+        }}>
+          <h3 style={{fontSize: '14px', fontWeight: '600', color: '#6fb6ff', marginBottom: '12px'}}>Demostración Rápida</h3>
+          <p style={{fontSize: '13px', color: '#9aa7bd', marginBottom: '12px'}}>Carga datos mínimos (1 película, 1 usuario) para presentar el flujo en segundos.</p>
+          <button onClick={() => prepareLoader(true)} style={{
+            width: '100%',
+            minHeight: '40px',
+            padding: '0 16px',
+            border: 'none',
+            borderRadius: '10px',
+            background: '#6fb6ff',
+            color: '#0d1117',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'background 0.2s ease'
+          }} onMouseOver={(e) => e.target.style.background = '#5ba3e8'} onMouseOut={(e) => e.target.style.background = '#6fb6ff'}>
+            → Usar Datos de Demo
+          </button>
+        </div>
+        
+        <div style={{
+          padding: '16px',
+          borderRadius: '12px',
+          border: '1px solid rgba(229, 166, 84, 0.3)',
+          background: 'rgba(229, 166, 84, 0.05)'
+        }}>
+          <h3 style={{fontSize: '14px', fontWeight: '600', color: '#e5a654', marginBottom: '12px'}}>Datos Completos</h3>
+          <p style={{fontSize: '13px', color: '#9aa7bd', marginBottom: '12px'}}>Copia todos los CSVs limpios del directorio data/clean/ a un directorio temporal.</p>
+          <button onClick={() => prepareLoader(false)} style={{
+            width: '100%',
+            minHeight: '40px',
+            padding: '0 16px',
+            border: 'none',
+            borderRadius: '10px',
+            background: '#e5a654',
+            color: '#0d1117',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'background 0.2s ease'
+          }} onMouseOver={(e) => e.target.style.background = '#d4934a'} onMouseOut={(e) => e.target.style.background = '#e5a654'}>
+            → Preparar Carga Completa
+          </button>
+        </div>
+      </div>
+      
+      <div style={{marginTop: '28px', paddingTop: '20px', borderTop: '1px solid rgba(233, 237, 245, 0.08)'}}>
+        <p style={{fontSize: '12px', color: '#9aa7bd', marginBottom: '12px', fontWeight: '500'}}>Subida manual (opcional):</p>
+        <div className="uploadRow">
+          <input type="file" multiple accept=".csv" onChange={(e) => setFiles(e.target.files)} style={{flex: 1}} />
+          <button onClick={upload} style={{
+            padding: '0 16px',
+            border: '1px solid rgba(233, 237, 245, 0.1)',
+            borderRadius: '10px',
+            background: 'rgba(233, 237, 245, 0.05)',
+            color: '#e9edf5',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'background 0.2s ease'
+          }} onMouseOver={(e) => e.target.style.background = 'rgba(111, 182, 255, 0.15)'} onMouseOut={(e) => e.target.style.background = 'rgba(233, 237, 245, 0.05)'}>
+            Subir CSV
+          </button>
+        </div>
+      </div>
+      
+      <div style={{marginTop: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px'}}>
+        <button onClick={() => runLoader(true)} style={{
+          minHeight: '42px',
+          padding: '0 16px',
+          border: '1px solid rgba(111, 182, 255, 0.2)',
+          borderRadius: '10px',
+          background: 'rgba(111, 182, 255, 0.08)',
+          color: '#6fb6ff',
+          fontWeight: '600',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease'
+        }} onMouseOver={(e) => {e.target.style.background = 'rgba(111, 182, 255, 0.15)'; e.target.style.borderColor = 'rgba(111, 182, 255, 0.4)'}} onMouseOut={(e) => {e.target.style.background = 'rgba(111, 182, 255, 0.08)'; e.target.style.borderColor = 'rgba(111, 182, 255, 0.2)'}}>
+          ◇ Ejecutar Dry-Run
+        </button>
+        <button onClick={() => runLoader(false)} style={{
+          minHeight: '42px',
+          padding: '0 16px',
+          border: '1px solid rgba(229, 166, 84, 0.2)',
+          borderRadius: '10px',
+          background: 'rgba(229, 166, 84, 0.12)',
+          color: '#e5a654',
+          fontWeight: '600',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease'
+        }} onMouseOver={(e) => {e.target.style.background = 'rgba(229, 166, 84, 0.2)'; e.target.style.borderColor = 'rgba(229, 166, 84, 0.4)'}} onMouseOut={(e) => {e.target.style.background = 'rgba(229, 166, 84, 0.12)'; e.target.style.borderColor = 'rgba(229, 166, 84, 0.2)'}}>
+          ✓ Ejecutar Carga Real
+        </button>
+      </div>
+      
+      <div style={{marginTop: '20px'}}>
+        <button onClick={clearDemoData} style={{
+          width: '100%',
+          minHeight: '38px',
+          padding: '0 16px',
+          border: '1px solid rgba(255, 112, 112, 0.2)',
+          borderRadius: '10px',
+          background: 'rgba(255, 112, 112, 0.08)',
+          color: '#ff8f8f',
+          fontWeight: '500',
+          fontSize: '13px',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease'
+        }} onMouseOver={(e) => {e.target.style.background = 'rgba(255, 112, 112, 0.15)'; e.target.style.borderColor = 'rgba(255, 112, 112, 0.3)'}} onMouseOut={(e) => {e.target.style.background = 'rgba(255, 112, 112, 0.08)'; e.target.style.borderColor = 'rgba(255, 112, 112, 0.2)'}}>
+          🗑️ Limpiar Datos de Demo
+        </button>
+      </div>
+      
+      <pre style={{
+        marginTop: '20px',
+        padding: '14px',
+        borderRadius: '10px',
+        background: 'rgba(13, 17, 23, 0.6)',
+        border: '1px solid rgba(233, 237, 245, 0.08)',
+        fontSize: '12px',
+        color: '#9aa7bd',
+        overflow: 'auto',
+        maxHeight: '240px',
+        fontFamily: 'monospace'
+      }} className="log">{log}</pre>
+      
+      {dataDir && <p style={{marginTop: '12px', fontSize: '12px', color: '#9aa7bd'}}>
+        <span style={{color: '#42d392'}}>✓</span> Data dir: <code style={{color: '#6fb6ff', fontFamily: 'monospace', fontSize: '11px'}}>{dataDir}</code>
+      </p>}
+      
+      <p style={{marginTop: '16px', fontSize: '12px', color: '#9aa7bd', fontStyle: 'italic'}}>
+        Nota: Asegúrate de que el backend tenga las variables de entorno de Neo4j en `.env` para carga real.
+      </p>
+    </section>
   );
 }
 
@@ -423,6 +634,7 @@ function App() {
           <Library likes={likes} watchlist={watchlist} collections={collections} currentUser={currentUser} reload={reloadUser} />
         )}
         {active === 'social' && <Social friends={friends} profile={profile} />}
+        {active === 'admin' && <AdminUpload />}
       </main>
       <Modal movieId={selectedMovie} close={() => setSelectedMovie(null)} />
     </>

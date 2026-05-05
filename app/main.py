@@ -1,11 +1,17 @@
 import os
 import re
+import sys
 import uuid
 from datetime import datetime, date
 from typing import Any, Dict, List, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from typing import List
+import shutil
+import subprocess
+from pathlib import Path
+from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from neo4j import GraphDatabase
 from pydantic import BaseModel, Field
@@ -246,6 +252,116 @@ def health():
     with driver.session(database=NEO4J_DATABASE) as session:
         result = session.run("RETURN 1 AS ok").single()["ok"]
     return {"status": "ok", "db": result}
+
+
+@app.post("/upload-csv", tags=["admin"])
+def upload_csv(files: List[UploadFile] = File(...)):
+    """Recibe uno o más archivos CSV y los guarda en `data/clean/uploaded/<timestamp>/`.
+    Devuelve la ruta donde se guardaron los archivos (para usarse con /run-loader).
+    """
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    dest_dir = Path("data/clean/uploaded") / ts
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    saved = []
+    for up in files:
+        filename = Path(up.filename).name
+        if not filename.lower().endswith(".csv"):
+            continue
+        dest = dest_dir / filename
+        with dest.open("wb") as f:
+            shutil.copyfileobj(up.file, f)
+        saved.append(str(dest))
+    return {"saved": saved, "data_dir": str(dest_dir)}
+
+
+@app.post("/prepare-loader", tags=["admin"])
+def prepare_loader(use_demo: bool = False):
+    """Copia automáticamente todos los CSVs limpios de `data/clean/` (o `data/clean/demo/` si use_demo=true)
+    a un directorio de upload con timestamp. Devuelve el data_dir listo para `/run-loader`.
+    """
+    source_dir = Path("data/clean/demo" if use_demo else "data/clean")
+    required_files = [
+        "movies_clean.csv",
+        "movie_genres_clean.csv",
+        "users_clean.csv",
+        "user_views_clean.csv",
+        "user_ratings_clean.csv",
+        "user_preferences_clean.csv",
+        "user_friendships_clean.csv",
+    ]
+    
+    missing = [f for f in required_files if not (source_dir / f).exists()]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing files in {source_dir}: {', '.join(missing)}")
+    
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    dest_dir = Path("data/clean/uploaded") / ts
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    
+    copied = []
+    for filename in required_files:
+        src = source_dir / filename
+        dst = dest_dir / filename
+        shutil.copy2(src, dst)
+        copied.append(str(dst))
+    
+    return {"copied": copied, "data_dir": str(dest_dir)}
+
+
+@app.post("/run-loader", tags=["admin"])
+def run_loader(data_dir: str = Form(...), dry_run: bool = Form(True)):
+    """Ejecuta el script de carga `scripts/load_clean_data_to_neo4j.py` contra el directorio dado.
+    Retorna la salida (stdout/stderr) del proceso para evidenciar la carga.
+    """
+    script = Path("scripts") / "load_clean_data_to_neo4j.py"
+    if not script.exists():
+        raise HTTPException(status_code=500, detail="Loader script not found on server")
+    cmd = [sys.executable, str(script), "--data-dir", data_dir]
+    if dry_run in (True, "true", "True", "1", 1):
+        cmd.append("--dry-run")
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    except subprocess.TimeoutExpired as e:
+        raise HTTPException(status_code=500, detail="Loader timed out")
+    return {"returncode": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
+
+
+@app.post("/clear-loader-data", tags=["admin"])
+def clear_loader_data(use_demo: bool = False):
+    """Elimina nodos y relaciones cargados. Si use_demo=true, elimina datos de demo específicos.
+    """
+    if use_demo:
+        demo_movie_ids = ["9999"]
+        demo_user_ids = ["U9999", "U8888"]
+        demo_director_ids = ["D_christopher_nolan_demo"]
+    else:
+        raise HTTPException(status_code=400, detail="Specify use_demo=true or provide specific IDs")
+    
+    try:
+        with driver.session(database=NEO4J_DATABASE) as session:
+            # Eliminar relaciones relacionadas a usuarios
+            for user_id in demo_user_ids:
+                session.run("MATCH (u:User {user_id: $uid})-[r]-() DELETE r", uid=user_id)
+            # Eliminar relaciones relacionadas a películas
+            for movie_id in demo_movie_ids:
+                session.run("MATCH (m:Movie {movie_id: $mid})-[r]-() DELETE r", mid=movie_id)
+            # Eliminar relaciones relacionadas a directores
+            for director_id in demo_director_ids:
+                session.run("MATCH (d:Director {director_id: $did})-[r]-() DELETE r", did=director_id)
+            
+            # Eliminar nodos de usuario
+            for user_id in demo_user_ids:
+                session.run("MATCH (u:User {user_id: $uid}) DELETE u", uid=user_id)
+            # Eliminar nodos de película
+            for movie_id in demo_movie_ids:
+                session.run("MATCH (m:Movie {movie_id: $mid}) DELETE m", mid=movie_id)
+            # Eliminar nodos de director
+            for director_id in demo_director_ids:
+                session.run("MATCH (d:Director {director_id: $did}) DELETE d", did=director_id)
+        
+        return {"status": "cleared", "message": "Demo data deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error clearing data: {str(e)}")
 
 
 # ============================================================
