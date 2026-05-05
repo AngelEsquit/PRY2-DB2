@@ -148,6 +148,8 @@ function AdminUpload() {
     }
   };
 
+
+
   return (
     <section className="panel">
       <h2>Administración - Carga de datos</h2>
@@ -268,6 +270,7 @@ function AdminUpload() {
           🗑️ Limpiar Datos de Demo
         </button>
       </div>
+
       
       <pre style={{
         marginTop: '20px',
