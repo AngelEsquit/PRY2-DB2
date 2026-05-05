@@ -1,4 +1,4 @@
-# Consultas Cypher de Demo (4-6 requeridas)
+# Consultas Cypher de Demo
 
 Este set esta alineado al modelo actual y al caso de uso de recomendacion/red social.
 
