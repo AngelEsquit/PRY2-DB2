@@ -322,6 +322,32 @@ main {
   padding: 0 12px;
 }
 
+.filterSelect {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(233, 237, 245, 0.12);
+  border-radius: 10px;
+  background: rgba(13, 17, 23, 0.92);
+  color: #e9edf5;
+  outline: none;
+  font-size: 13px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  color-scheme: dark;
+}
+
+.filterSelect option {
+  background: #111827;
+  color: #e9edf5;
+}
+
+.filterSelect:focus {
+  border-color: rgba(111, 182, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(111, 182, 255, 0.12);
+}
+
 .panel {
   margin-top: 18px;
   padding: 24px;
@@ -459,6 +485,10 @@ main {
 
 .wide {
   margin-top: 16px;
+}
+
+.library .wide {
+  grid-column: 1 / -1;
 }
 
 .row {

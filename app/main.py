@@ -90,6 +90,22 @@ class SearchNodesRequest(BaseModel):
     limit: int = 50
 
 
+class MovieSearchRequest(BaseModel):
+    query: str = ""
+    genre: str = ""
+    director: str = ""
+    language: str = ""
+    year: str = ""
+    min_rating: Optional[float] = None
+    skip: int = 0
+    limit: int = 50
+
+
+class DirectorSuggestQuery(BaseModel):
+    query: str = ""
+    limit: int = 8
+
+
 class AggregateNodesRequest(BaseModel):
     label: str
     operation: Literal["count", "avg", "sum", "min", "max"]
@@ -278,7 +294,10 @@ def upload_csv(files: List[UploadFile] = File(...)):
 def prepare_loader(use_demo: bool = False):
     """Copia automáticamente todos los CSVs limpios de `data/clean/` (o `data/clean/demo/` si use_demo=true)
     a un directorio de upload con timestamp. Devuelve el data_dir listo para `/run-loader`.
-    Si use_demo=true, también crea un usuario Reviewer (User:Reviewer) para demostrar 2+ labels.
+    Si use_demo=true, también crea nodos de rúbrica que cubren:
+    - CREATE con un nodo de una sola label
+    - CREATE/MERGE con un usuario Reviewer con 2 labels
+    - CREATE/MERGE con un nodo de Collection con al menos 5 propiedades
     """
     source_dir = Path("data/clean/demo" if use_demo else "data/clean")
     required_files = [
@@ -306,33 +325,88 @@ def prepare_loader(use_demo: bool = False):
         shutil.copy2(src, dst)
         copied.append(str(dst))
     
-    # Si es demo, crear usuario Reviewer automáticamente (User:Reviewer = 2+ labels)
-    reviewer_created = False
+    rubric_nodes = []
     if use_demo:
         try:
             with driver.session(database=NEO4J_DATABASE) as session:
-                session.run(
+                session.run("MATCH (u:User {user_id: $uid}) DETACH DELETE u", uid="UDEMO_CREATE")
+                session.run("MATCH (u:User {user_id: $uid}) DETACH DELETE u", uid="REVIEWER_DEMO")
+                created_user = session.run(
                     """
-                    CREATE (n:User:Reviewer {
-                        user_id: 'REVIEWER_DEMO',
-                        name: 'Demo Critic',
-                        age: 42,
-                        country: 'US',
-                        premium: true,
-                        professional_status: 'verified',
-                        review_count: 0,
-                        avg_rating: 0.0,
-                        joined_date: date('2026-05-05')
+                    CREATE (u:User {
+                        user_id: 'UDEMO_CREATE',
+                        name: 'Demo Viewer',
+                        age: 29,
+                        country: 'MX',
+                        premium: false,
+                        signup_source: 'demo'
                     })
+                    RETURN labels(u) AS labels, properties(u) AS properties
                     """
-                )
-            reviewer_created = True
+                ).single()
+                created_reviewer = session.run(
+                    """
+                    MERGE (r:User:Reviewer {user_id: 'REVIEWER_DEMO'})
+                    ON CREATE SET
+                        r.name = 'Demo Critic',
+                        r.age = 42,
+                        r.country = 'US',
+                        r.premium = true,
+                        r.professional_status = 'verified',
+                        r.review_count = 0,
+                        r.avg_rating = 0.0,
+                        r.joined_date = date('2026-05-05')
+                    ON MATCH SET
+                        r.name = 'Demo Critic',
+                        r.age = 42,
+                        r.country = 'US',
+                        r.premium = true,
+                        r.professional_status = 'verified',
+                        r.review_count = 0,
+                        r.avg_rating = 0.0
+                    RETURN labels(r) AS labels, properties(r) AS properties
+                    """
+                ).single()
+                created_collection = session.run(
+                    """
+                    MERGE (c:Collection {collection_id: 'COL_RUBRIC_DEMO'})
+                    ON CREATE SET
+                        c.name = 'Featured Demo Collection',
+                        c.description = 'Coleccion curada para demostrar CREATE/MERGE',
+                        c.genre = 'Mixed',
+                        c.source = 'rubric_demo',
+                        c.visibility = 'public',
+                        c.created_at = date('2026-05-05')
+                    ON MATCH SET
+                        c.name = 'Featured Demo Collection',
+                        c.description = 'Coleccion curada para demostrar CREATE/MERGE',
+                        c.genre = 'Mixed',
+                        c.source = 'rubric_demo',
+                        c.visibility = 'public'
+                    RETURN labels(c) AS labels, properties(c) AS properties
+                    """
+                ).single()
+                rubric_nodes.append({
+                    "operation": "CREATE",
+                    "labels": created_user["labels"],
+                    "properties": created_user["properties"],
+                })
+                rubric_nodes.append({
+                    "operation": "MERGE",
+                    "labels": created_reviewer["labels"],
+                    "properties": created_reviewer["properties"],
+                })
+                rubric_nodes.append({
+                    "operation": "MERGE",
+                    "labels": created_collection["labels"],
+                    "properties": created_collection["properties"],
+                })
         except Exception:
             pass  # Si ya existe, ignorar
     
     result = {"copied": copied, "data_dir": str(dest_dir)}
-    if reviewer_created:
-        result["reviewer_note"] = "Demo Critic user created with 2+ labels (User:Reviewer) for rubric compliance"
+    if rubric_nodes:
+        result["rubric_nodes"] = rubric_nodes
     return result
 
 
@@ -357,11 +431,12 @@ def run_loader(data_dir: str = Form(...), dry_run: bool = Form(True)):
 @app.post("/clear-loader-data", tags=["admin"])
 def clear_loader_data(use_demo: bool = False):
     """Elimina nodos y relaciones cargados. Si use_demo=true, elimina datos de demo específicos,
-    incluyendo el usuario Reviewer (User:Reviewer) creado para demostración.
+    incluyendo los nodos de rúbrica creados para demostración.
     """
     if use_demo:
         demo_movie_ids = ["9999"]
-        demo_user_ids = ["U9999", "U8888", "REVIEWER_DEMO"]
+        demo_user_ids = ["U9999", "U8888", "REVIEWER_DEMO", "UDEMO_CREATE"]
+        demo_collection_ids = ["COL_RUBRIC_DEMO"]
         demo_director_ids = ["D_christopher_nolan_demo"]
     else:
         raise HTTPException(status_code=400, detail="Specify use_demo=true or provide specific IDs")
@@ -377,6 +452,9 @@ def clear_loader_data(use_demo: bool = False):
             # Eliminar relaciones relacionadas a directores
             for director_id in demo_director_ids:
                 session.run("MATCH (d:Director {director_id: $did})-[r]-() DELETE r", did=director_id)
+            # Eliminar relaciones relacionadas a collections
+            for collection_id in demo_collection_ids:
+                session.run("MATCH (c:Collection {collection_id: $cid})-[r]-() DELETE r", cid=collection_id)
             
             # Eliminar nodos de usuario
             for user_id in demo_user_ids:
@@ -387,6 +465,9 @@ def clear_loader_data(use_demo: bool = False):
             # Eliminar nodos de director
             for director_id in demo_director_ids:
                 session.run("MATCH (d:Director {director_id: $did}) DELETE d", did=director_id)
+            # Eliminar nodos de collection
+            for collection_id in demo_collection_ids:
+                session.run("MATCH (c:Collection {collection_id: $cid}) DELETE c", cid=collection_id)
         
         return {"status": "cleared", "message": "Demo data deleted successfully"}
     except Exception as e:
@@ -483,6 +564,102 @@ def search_nodes(payload: SearchNodesRequest):
     {where_clause}
     RETURN elementId(n) AS element_id, labels(n) AS labels, properties(n) AS properties
     SKIP $skip LIMIT $limit
+    """
+    with driver.session(database=NEO4J_DATABASE) as session:
+        rows = [dict(r) for r in session.run(query, **params)]
+    return {"count": len(rows), "items": rows}
+
+
+@app.post("/movies/search", tags=["movies"])
+def search_movies(payload: MovieSearchRequest):
+    params: Dict[str, Any] = {
+        "search_text": payload.query.strip(),
+        "genre": payload.genre.strip(),
+        "director": payload.director.strip(),
+        "language": payload.language.strip(),
+        "year": payload.year.strip(),
+        "min_rating": payload.min_rating,
+        "skip": max(0, payload.skip),
+        "limit": max(1, min(payload.limit, 250)),
+    }
+
+    count_query = """
+    MATCH (m:Movie)
+    WHERE
+        ($search_text = '' OR toLower(coalesce(m.title, '')) CONTAINS toLower($search_text) OR toLower(coalesce(m.overview, '')) CONTAINS toLower($search_text))
+        AND ($language = '' OR toLower(coalesce(m.original_language, '')) = toLower($language))
+        AND ($year = '' OR substring(toString(m.release_date), 0, 4) = $year)
+        AND ($min_rating IS NULL OR coalesce(m.vote_average, 0) >= $min_rating)
+        AND (
+            $genre = '' OR EXISTS {
+                MATCH (m)-[:HAS_GENRE]->(g:Genre)
+                WHERE g.name = $genre
+            }
+        )
+        AND (
+            $director = '' OR EXISTS {
+                MATCH (d:Director)-[:DIRECTED]->(m)
+                WHERE toLower(coalesce(d.name, '')) CONTAINS toLower($director)
+                   OR toLower(coalesce(d.director_id, '')) CONTAINS toLower($director)
+            }
+        )
+    RETURN count(m) AS total
+    """
+
+    query = """
+    MATCH (m:Movie)
+    WHERE
+        ($search_text = '' OR toLower(coalesce(m.title, '')) CONTAINS toLower($search_text) OR toLower(coalesce(m.overview, '')) CONTAINS toLower($search_text))
+        AND ($language = '' OR toLower(coalesce(m.original_language, '')) = toLower($language))
+        AND ($year = '' OR substring(toString(m.release_date), 0, 4) = $year)
+        AND ($min_rating IS NULL OR coalesce(m.vote_average, 0) >= $min_rating)
+        AND (
+            $genre = '' OR EXISTS {
+                MATCH (m)-[:HAS_GENRE]->(g:Genre)
+                WHERE g.name = $genre
+            }
+        )
+        AND (
+            $director = '' OR EXISTS {
+                MATCH (d:Director)-[:DIRECTED]->(m)
+                WHERE toLower(coalesce(d.name, '')) CONTAINS toLower($director)
+                   OR toLower(coalesce(d.director_id, '')) CONTAINS toLower($director)
+            }
+        )
+    OPTIONAL MATCH (m)-[:HAS_GENRE]->(g:Genre)
+    OPTIONAL MATCH (d:Director)-[:DIRECTED]->(m)
+    WITH
+        m,
+        collect(DISTINCT g.name) AS genres,
+        [name IN collect(DISTINCT d.name) WHERE name IS NOT NULL] AS director_names,
+        [id IN collect(DISTINCT d.director_id) WHERE id IS NOT NULL] AS director_ids
+    RETURN
+        elementId(m) AS element_id,
+        labels(m) AS labels,
+        properties(m) AS properties,
+        genres,
+        director_names[0] AS director,
+        director_ids[0] AS director_id
+    ORDER BY coalesce(m.vote_average, 0) DESC, coalesce(m.popularity, 0) DESC
+    SKIP $skip LIMIT $limit
+    """
+
+    with driver.session(database=NEO4J_DATABASE) as session:
+        total = session.run(count_query, **params).single()["total"]
+        rows = [dict(r) for r in session.run(query, **params)]
+    return {"count": total, "items": rows}
+
+
+@app.get("/directors/suggest", tags=["movies"])
+def suggest_directors(q: str = "", limit: int = 8):
+    text = q.strip()
+    params = {"q": text.lower(), "limit": max(1, min(limit, 15))}
+    query = """
+    MATCH (d:Director)
+    WHERE $q = '' OR toLower(coalesce(d.name, '')) CONTAINS $q OR toLower(coalesce(d.director_id, '')) CONTAINS $q
+    RETURN d.director_id AS director_id, d.name AS name, d.nationality AS nationality
+    ORDER BY coalesce(d.name, d.director_id)
+    LIMIT $limit
     """
     with driver.session(database=NEO4J_DATABASE) as session:
         rows = [dict(r) for r in session.run(query, **params)]
@@ -1516,12 +1693,17 @@ def get_collections(user_id: str):
                 c.name AS name,
                 c.description AS description,
                 coalesce(cr.created_at, cr.created_date) AS created_at,
-                count(m) AS movie_count
+                count(DISTINCT m) AS movie_count,
+                collect(DISTINCT CASE WHEN m IS NULL THEN null ELSE m { .movie_id, .title, .vote_average, .release_date } END) AS movies
             ORDER BY coalesce(cr.created_at, cr.created_date) DESC
             """,
             uid=user_id,
         )
-        items = [dict(r) for r in rows]
+        items = []
+        for r in rows:
+            item = dict(r)
+            item["movies"] = [movie for movie in item.get("movies", []) if movie]
+            items.append(item)
     return {"user_id": user_id, "total": len(items), "items": items}
 
 
@@ -1623,8 +1805,9 @@ def remove_movie_from_collection(user_id: str, collection_id: str, movie_id: str
             """
             MATCH (u:User {user_id: $uid})-[:CREATED]->(c:Collection {collection_id: $cid})
                   -[cn:CONTAINS]->(m:Movie {movie_id: $mid})
+            WITH cn LIMIT 1
             DELETE cn
-            RETURN count(cn) AS affected
+            RETURN 1 AS affected
             """,
             uid=user_id, cid=collection_id, mid=movie_id,
         ).single()
