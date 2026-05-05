@@ -334,6 +334,191 @@ function NodePropertyManager() {
     </section>
   );
 }
+
+function AggregateManager() {
+  const [payloadText, setPayloadText] = useState(() => JSON.stringify({
+    label: 'Movie',
+    operation: 'avg',
+    field: 'vote_average',
+    group_by: 'original_language',
+    filters: {},
+  }, null, 2));
+  const [result, setResult] = useState('');
+  const [status, setStatus] = useState('');
+
+  const runAggregate = async () => {
+    setStatus('Ejecutando agregacion...');
+    try {
+      const payload = JSON.parse(payloadText);
+      const response = await api.aggregateNodes(payload);
+      setResult(JSON.stringify(response, null, 2));
+      setStatus('Agregacion completada');
+    } catch (err) {
+      setStatus(err.message);
+    }
+  };
+
+  return (
+    <section className="panel" style={{marginTop: '18px'}}>
+      <h2>Agregaciones</h2>
+      <p>Ejecuta count, avg, sum, min o max sobre nodos filtrados.</p>
+      <textarea
+        value={payloadText}
+        onChange={(event) => setPayloadText(event.target.value)}
+        style={{
+          width: '100%',
+          minHeight: '160px',
+          padding: '12px',
+          borderRadius: '10px',
+          border: '1px solid rgba(233, 237, 245, 0.12)',
+          background: 'rgba(13, 17, 23, 0.8)',
+          color: '#e9edf5',
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          resize: 'vertical',
+        }}
+      />
+      <button type="button" onClick={runAggregate} style={{marginTop: '10px', minHeight: '38px', padding: '0 14px'}}>
+        Ejecutar agregacion
+      </button>
+      <pre style={{marginTop: '12px', padding: '14px', borderRadius: '10px', background: 'rgba(13, 17, 23, 0.6)', border: '1px solid rgba(233, 237, 245, 0.08)', fontSize: '12px', color: '#9aa7bd', overflow: 'auto', whiteSpace: 'pre-wrap'}}>
+        {result || 'Aqui aparecera la respuesta del backend.'}
+      </pre>
+      <p style={{fontSize: '12px', color: status.includes('completada') ? '#42d392' : '#9aa7bd', margin: 0}}>{status || 'Listo para consultar agregaciones.'}</p>
+    </section>
+  );
+}
+
+function RelationshipManager() {
+  const [createText, setCreateText] = useState(() => JSON.stringify({
+    start: { label: 'User', id_property: 'user_id', id_value: 'U00001' },
+    end: { label: 'Movie', id_property: 'movie_id', id_value: '19995' },
+    rel_type: 'TEMP_REL',
+    properties: {
+      added_at: '2026-05-05',
+      priority: 1,
+      source: 'frontend_demo',
+    },
+  }, null, 2));
+  const [oneText, setOneText] = useState(() => JSON.stringify({
+    selector: {
+      start: { label: 'User', id_property: 'user_id', id_value: 'U00001' },
+      end: { label: 'Movie', id_property: 'movie_id', id_value: '19995' },
+      rel_type: 'TEMP_REL',
+      direction: 'outgoing',
+      relationship_match_properties: { source: 'frontend_demo' },
+    },
+    properties: { reviewed_by: 'admin' },
+  }, null, 2));
+  const [manyText, setManyText] = useState(() => JSON.stringify({
+    start_label: 'User',
+    end_label: 'Movie',
+    rel_type: 'TEMP_REL',
+    direction: 'outgoing',
+    start_filters: { user_id: 'U00001' },
+    end_filters: {},
+    relationship_filters: { source: 'frontend_demo' },
+    properties: { reviewed_by: 'admin' },
+  }, null, 2));
+  const [deleteKeysText, setDeleteKeysText] = useState('["reviewed_by"]');
+  const [result, setResult] = useState('');
+  const [status, setStatus] = useState('');
+
+  const run = async (action) => {
+    setStatus('Ejecutando operacion...');
+    try {
+      let response = null;
+      if (action === 'create') {
+        response = await api.createRelationship(JSON.parse(createText));
+      } else if (action === 'add-one') {
+        response = await api.addRelationshipPropertiesOne(JSON.parse(oneText));
+      } else if (action === 'update-one') {
+        response = await api.updateRelationshipPropertiesOne(JSON.parse(oneText));
+      } else if (action === 'delete-one-props') {
+        const payload = JSON.parse(oneText);
+        response = await api.deleteRelationshipPropertiesOne({ selector: payload.selector, property_keys: JSON.parse(deleteKeysText) });
+      } else if (action === 'add-many') {
+        response = await api.addRelationshipPropertiesMany(JSON.parse(manyText));
+      } else if (action === 'update-many') {
+        response = await api.updateRelationshipPropertiesMany(JSON.parse(manyText));
+      } else if (action === 'delete-many-props') {
+        const payload = JSON.parse(manyText);
+        response = await api.deleteRelationshipPropertiesMany({ ...payload, property_keys: JSON.parse(deleteKeysText) });
+      } else if (action === 'delete-one') {
+        const payload = JSON.parse(oneText);
+        response = await api.deleteRelationshipOne({ selector: payload.selector });
+      } else if (action === 'delete-many') {
+        response = await api.deleteRelationshipMany(JSON.parse(manyText));
+      }
+      setResult(JSON.stringify(response, null, 2));
+      setStatus('Operacion completada');
+    } catch (err) {
+      setStatus(err.message);
+    }
+  };
+
+  const textStyle = {
+    width: '100%',
+    minHeight: '180px',
+    padding: '12px',
+    borderRadius: '10px',
+    border: '1px solid rgba(233, 237, 245, 0.12)',
+    background: 'rgba(13, 17, 23, 0.8)',
+    color: '#e9edf5',
+    fontFamily: 'monospace',
+    fontSize: '12px',
+    resize: 'vertical',
+  };
+
+  const buttonStyle = {
+    minHeight: '38px',
+    padding: '0 12px',
+    borderRadius: '10px',
+    border: '1px solid rgba(233, 237, 245, 0.12)',
+    background: 'rgba(233, 237, 245, 0.05)',
+    color: '#e9edf5',
+    cursor: 'pointer',
+  };
+
+  return (
+    <section className="panel" style={{marginTop: '18px'}}>
+      <h2>Gestion de relaciones</h2>
+      <p>Crea relaciones y administra propiedades en una o varias relaciones.</p>
+      <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '14px'}}>
+        <div>
+          <h3>Crear relacion</h3>
+          <textarea value={createText} onChange={(event) => setCreateText(event.target.value)} style={textStyle} />
+          <button type="button" onClick={() => run('create')} style={buttonStyle}>Crear relacion</button>
+        </div>
+        <div>
+          <h3>Relacion individual</h3>
+          <textarea value={oneText} onChange={(event) => setOneText(event.target.value)} style={textStyle} />
+          <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px'}}>
+            <button type="button" onClick={() => run('add-one')} style={buttonStyle}>Agregar props</button>
+            <button type="button" onClick={() => run('update-one')} style={buttonStyle}>Actualizar props</button>
+            <button type="button" onClick={() => run('delete-one-props')} style={buttonStyle}>Eliminar props</button>
+            <button type="button" onClick={() => run('delete-one')} style={buttonStyle}>Eliminar relacion</button>
+          </div>
+        </div>
+        <div>
+          <h3>Multiples relaciones</h3>
+          <textarea value={manyText} onChange={(event) => setManyText(event.target.value)} style={textStyle} />
+          <textarea value={deleteKeysText} onChange={(event) => setDeleteKeysText(event.target.value)} style={{...textStyle, minHeight: '48px', marginTop: '8px'}} />
+          <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px'}}>
+            <button type="button" onClick={() => run('add-many')} style={buttonStyle}>Agregar props</button>
+            <button type="button" onClick={() => run('update-many')} style={buttonStyle}>Actualizar props</button>
+            <button type="button" onClick={() => run('delete-many-props')} style={buttonStyle}>Eliminar props</button>
+            <button type="button" onClick={() => run('delete-many')} style={buttonStyle}>Eliminar relaciones</button>
+          </div>
+        </div>
+      </div>
+      <pre style={{marginTop: '12px', padding: '14px', borderRadius: '10px', background: 'rgba(13, 17, 23, 0.6)', border: '1px solid rgba(233, 237, 245, 0.08)', fontSize: '12px', color: '#9aa7bd', overflow: 'auto', whiteSpace: 'pre-wrap'}}>
+        {result || 'Aqui aparecera la respuesta del backend.'}
+      </pre>
+      <p style={{fontSize: '12px', color: status.includes('completada') ? '#42d392' : '#9aa7bd', margin: 0}}>{status || 'Listo para operar relaciones.'}</p>
+    </section>
+  );
+}
 function AdminUpload() {
   const [files, setFiles] = useState(null);
   const [dataDir, setDataDir] = useState('');
@@ -548,6 +733,8 @@ function AdminUpload() {
         Nota: Asegúrate de que el backend tenga las variables de entorno de Neo4j en `.env` para carga real.
       </p>
       <NodePropertyManager />
+      <AggregateManager />
+      <RelationshipManager />
     </section>
   );
 }

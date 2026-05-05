@@ -1724,7 +1724,11 @@ def create_collection(user_id: str, payload: CollectionCreateRequest):
                 collection_id: $cid,
                 name: $name,
                 description: $desc,
-                created_at: date()
+                created_at: date(),
+                public: false,
+                followers_count: 0,
+                source: 'user',
+                last_updated: date()
             })
             CREATE (u)-[cr:CREATED {created_at: date(), title: 'custom', public: false, source: 'user'}]->(c)
             """,

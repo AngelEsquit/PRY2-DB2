@@ -1,37 +1,37 @@
 # Validación Post Carga
 
-- Fecha: 2026-05-03 11:58:18
+- Fecha: 2026-05-05 16:38:53
 - Estado: **PASS**
 - Base de datos: `de905a51`
 
 ## Resumen
 
-- Total de nodos: 13828
-- Total de relaciones: 215854
+- Total de nodos: 13836
+- Total de relaciones: 215876
 
 ## Conteo de nodos
 
 - Movie: 4803
 - User: 2200
-- Genre: 19
+- Genre: 20
 - Director: 2350
 - Language: 37
-- Collection: 4419
+- Collection: 4426
 
 ## Conteo de relaciones
 
 - DIRECTED: 4803
-- HAS_GENRE: 12113
+- HAS_GENRE: 12114
 - IN_LANGUAGE: 4803
-- CONTAINS: 32226
+- CONTAINS: 32234
 - VIEWED: 72530
 - RATED: 39967
 - PREFERS: 6668
 - FRIEND_OF: 21984
-- WATCHLISTED: 11150
-- LIKED: 8665
+- WATCHLISTED: 11151
+- LIKED: 8670
 - FOLLOWS_DIRECTOR: 7518
-- CREATED: 4419
+- CREATED: 4426
 
 ## Controles de integridad
 
@@ -49,14 +49,14 @@
 - Movie (< 5 props): 0
 - User (< 5 props): 0
 - Genre (< 5 props): 0
-- Director (< 5 props): 1
+- Director (< 5 props): 0
 - Language (< 5 props): 0
 - Collection (< 5 props): 0
 
 ### Relaciones con menos propiedades de las requeridas
 
-- DIRECTED (< 3 props): 60
-- HAS_GENRE (< 3 props): 56
+- DIRECTED (< 3 props): 0
+- HAS_GENRE (< 3 props): 0
 - IN_LANGUAGE (< 3 props): 0
 - CONTAINS (< 3 props): 0
 - VIEWED (< 3 props): 0
@@ -71,15 +71,10 @@
 ## Conectividad
 
 - Seed elegido: English ['Language']
-- Nodos restantes: 13827
-- Alcanzables desde seed: 13827
+- Nodos restantes: 13835
+- Alcanzables desde seed: 13835
 - No alcanzables desde seed: 0
 
 ## Conclusión
 
 La carga cumple la validación formal básica post carga.
-
-### Observaciones no críticas
-- Nodos Director con menos de 5 propiedades: 1
-- Relaciones DIRECTED con menos de 3 propiedades: 60
-- Relaciones HAS_GENRE con menos de 3 propiedades: 56
