@@ -1,4 +1,4 @@
-# Consultas Cypher de Demo
+# Consultas Cypher de Demo (4-6 requeridas)
 
 Este set esta alineado al modelo actual y al caso de uso de recomendacion/red social.
 
@@ -36,48 +36,34 @@ ORDER BY followers DESC
 LIMIT 15;
 ```
 
-## Consulta 4 - Similitud entre dos usuarios (Jaccard)
+## Consulta 4 - Similitud entre usuarios (Jaccard)
 
-Objetivo: evidencia del algoritmo base colaborativo del proyecto.
-
-Cambiar U00001 y U00002 por ids reales del dataset.
+Objetivo: mostrar similitud de gustos entre dos usuarios usando Jaccard sobre peliculas vistas/valoradas.
 
 ```cypher
-MATCH (u1:User {user_id: 'U00001'})
-MATCH (u2:User {user_id: 'U00002'})
-OPTIONAL MATCH (u1)-[:LIKED]->(m1:Movie)
-OPTIONAL MATCH (u1)-[r1:RATED]->(m1r:Movie)
-WHERE r1.rating >= 8
-WITH u1, u2, collect(DISTINCT m1.movie_id) + collect(DISTINCT m1r.movie_id) AS set1
-OPTIONAL MATCH (u2)-[:LIKED]->(m2:Movie)
-OPTIONAL MATCH (u2)-[r2:RATED]->(m2r:Movie)
-WHERE r2.rating >= 8
-WITH set1, collect(DISTINCT m2.movie_id) + collect(DISTINCT m2r.movie_id) AS set2
-WITH apoc.coll.toSet(set1) AS a, apoc.coll.toSet(set2) AS b
-RETURN
-  size([x IN a WHERE x IN b]) AS intersection,
-  size(apoc.coll.toSet(a + b)) AS union_size,
-  CASE WHEN size(apoc.coll.toSet(a + b)) = 0
-       THEN 0.0
-       ELSE toFloat(size([x IN a WHERE x IN b])) / toFloat(size(apoc.coll.toSet(a + b)))
-  END AS jaccard_score;
-```
+// 1. Buscamos pares de usuarios que compartan al menos una película
+MATCH (u1:User)-[:LIKED|RATED]->(m:Movie)<-[:LIKED|RATED]-(u2:User)
+WHERE id(u1) < id(u2) // Evita duplicados (A-B y B-A) y compararse consigo mismo
 
-Nota: si no tienes APOC habilitado en Aura, usa la version alternativa sin APOC.
+// 2. Obtenemos las listas de películas de cada uno para el cálculo
+MATCH (u1)-[:LIKED|RATED]->(m1:Movie)
+WITH u1, u2, collect(DISTINCT m1.movie_id) AS a
+MATCH (u2)-[:LIKED|RATED]->(m2:Movie)
+WITH u1, u2, a, collect(DISTINCT m2.movie_id) AS b
 
-```cypher
-MATCH (u1:User {user_id: 'U00001'})-[:LIKED|RATED]->(m:Movie)
-WITH collect(DISTINCT m.movie_id) AS a
-MATCH (u2:User {user_id: 'U00002'})-[:LIKED|RATED]->(m:Movie)
-WITH a, collect(DISTINCT m.movie_id) AS b
-WITH a, b, [x IN a WHERE x IN b] AS inter
-RETURN
-  size(inter) AS intersection,
-  size(a) + size([x IN b WHERE NOT x IN a]) AS union_size,
-  CASE WHEN (size(a) + size([x IN b WHERE NOT x IN a])) = 0
-       THEN 0.0
-       ELSE toFloat(size(inter)) / toFloat(size(a) + size([x IN b WHERE NOT x IN a]))
-  END AS jaccard_score;
+// 3. Calculamos intersección y unión
+WITH u1, u2, a, b, [x IN a WHERE x IN b] AS inter
+WITH u1, u2, 
+     size(inter) AS intersection, 
+     (size(a) + size([x IN b WHERE NOT x IN a])) AS union_size
+
+// 4. Calculamos el score y filtramos
+WITH u1, u2, intersection, union_size,
+     toFloat(intersection) / toFloat(union_size) AS jaccard_score
+WHERE jaccard_score > 0
+
+RETURN u1.user_id AS UserA, u2.user_id AS UserB, jaccard_score
+ORDER BY jaccard_score DESC
 ```
 
 ## Consulta 5 - Recomendaciones candidatas para un usuario
