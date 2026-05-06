@@ -397,6 +397,7 @@ function NodePropertyManager() {
             value={manyFiltersText}
             onChange={(event) => setManyFiltersText(event.target.value)}
             placeholder='{"campo": "valor"}'
+            style={textAreaStyle}
           />
           <textarea
             value={manyPropertiesText}
@@ -676,7 +677,21 @@ function AggregateManager() {
           resize: 'vertical',
         }}
       />
-      <button type="button" onClick={runAggregate} style={{marginTop: '10px', minHeight: '38px', padding: '0 14px'}}>
+      <button
+        type="button"
+        onClick={runAggregate}
+        style={{
+          marginTop: '10px',
+          minHeight: '38px',
+          padding: '0 14px',
+          borderRadius: '10px',
+          border: '1px solid rgba(229, 166, 84, 0.22)',
+          background: 'rgba(229, 166, 84, 0.1)',
+          color: '#e5a654',
+          fontWeight: '600',
+          cursor: 'pointer',
+        }}
+      >
         Ejecutar agregacion
       </button>
       <pre style={{marginTop: '12px', padding: '14px', borderRadius: '10px', background: 'rgba(13, 17, 23, 0.6)', border: '1px solid rgba(233, 237, 245, 0.08)', fontSize: '12px', color: '#9aa7bd', overflow: 'auto', whiteSpace: 'pre-wrap'}}>
@@ -711,11 +726,11 @@ function RelationshipManager() {
   const [manyText, setManyText] = useState(() => JSON.stringify({
     start_label: 'User',
     end_label: 'Movie',
-    rel_type: 'TEMP_REL',
+    rel_type: 'RATED',
     direction: 'outgoing',
     start_filters: { user_id: 'U00001' },
     end_filters: {},
-    relationship_filters: { source: 'frontend_demo' },
+    relationship_filters: {},
     properties: { reviewed_by: 'admin' },
   }, null, 2));
   const [deleteKeysText, setDeleteKeysText] = useState('["reviewed_by"]');
